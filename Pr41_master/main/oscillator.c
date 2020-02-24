@@ -178,7 +178,8 @@ void oscillator_init(void)
 
 #elif defined CLOCK_INTERNAL_FRC_7MHZ_NOPLL
 	//ничего не делаем, все работает на частоте 7MHZ, usart и жк-экран отвалятся без дополнительного конфигурирования
-
+#else
+	Error!
 #endif
 
 	return;

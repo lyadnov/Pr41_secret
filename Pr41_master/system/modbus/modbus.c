@@ -7,13 +7,13 @@
 
 
 //для отладки
-unsigned int stat_modbus_all_frame=0;
-	unsigned int stat_usart_frame_bad=0;
-	unsigned int stat_usart_frame_good=0;
-		unsigned int stat_modbus_frame_error_func=0;
-		unsigned int stat_modbus_frame_error_crc=0;
-		unsigned int stat_modbus_frame_error_slave_addr=0;
-		unsigned int stat_modbus_frame_crc_ok=0;
+unsigned int stat_modbus_frame_all = 0;
+	unsigned int stat_modbus_usart_bad = 0;
+	unsigned int stat_modbus_usart_good = 0;
+		unsigned int stat_modbus_frame_error_func = 0;
+		unsigned int stat_modbus_frame_error_crc = 0;
+		unsigned int stat_modbus_frame_error_slave_addr = 0;
+		unsigned int stat_modbus_frame_crc_ok = 0;
 
 ///////////////////////////////////
 void modbus_init(void)

@@ -12,14 +12,16 @@ unsigned char frame[256]; //делаю переменною глобальной,так проще для отлаки
 char Mbs_read(unsigned char *c)
 {
 	char res;
+	unsigned short val;
 
-	res=UsartRxByte(c);
-	if(res)
+	res = UsartRxByte(&val);
+	if (res)
 	{
 		//данные принялись с ошибкой по линии usart
 		UsartWaitForSilence();
 	}
 
+	*c = val & 0xFF; //dml!!! проверять 9ий бит
 	return res;
 }
 
@@ -45,7 +47,7 @@ void Mbs_write(unsigned char frame_out[256], unsigned short len)
 	
 	 for(i=0;i<len;i++)
 	 {
-		UsartTxByteX(frame_out[i]);
+		UsartTxByteX(frame_out[i], 0);
 	 }
 	 
 	//////////////////////////////

@@ -4,12 +4,15 @@
 #include "system\usart\usart.h"
 
 //----------константы-------------- 
+//#define USART_19200
+#define USART_115200
+#define USART_9bit
 
 //---------переменные--------------
-unsigned int stat_usart_error_timout=0;
-unsigned int stat_usart_error_frame=0;
-unsigned int stat_usart_error_parity=0;
-unsigned int stat_usart_error_overrun=0;
+unsigned int stat_usart_error_timout = 0;
+unsigned int stat_usart_error_frame = 0;
+unsigned int stat_usart_error_parity = 0;
+unsigned int stat_usart_error_overrun = 0;
 
 
 //----------функции----------------
@@ -26,15 +29,26 @@ void UsartInit(void)
 	
 	TRISBbits.TRISB15=0;    //управл€ем выходом 1=TX 0=RX
 
-			
 	//модуль usart
-	U1MODEbits.BRGH=1;      //High Baud Rate Enable bit
-	U1BRG=86;                //115200кб/сек= (40*1000*1000√ц)/(4*(86+1))  
-	//U1MODEbits.BRGH=0;         //High Baud Rate Enable bit
-	//U1BRG=21;                //115200кб/сек: 113636бит/сек=(40*1000*1000√ц)/(16*(86+1))  
-
+#ifdef USART_19200
+	U1MODEbits.BRGH=1;       //High Baud Rate Enable bit
+	U1BRG=520;               //19193бит/сек= (40*1000*1000√ц)/(4*(520+1))  
+#elif defined USART_115200
+	/* USART speed 115200 */
+	U1MODEbits.BRGH=1;       //High Baud Rate Enable bit
+	U1BRG=86;                //115200бит/сек= (40*1000*1000√ц)/(4*(86+1))  
+	//U1MODEbits.BRGH=0;     //High Baud Rate Enable bit
+	//U1BRG=21;              //115200бит/сек: 113636бит/сек=(40*1000*1000√ц)/(16*(86+1))  
+#else
+	Error!
+#endif
+	
 	U1MODEbits.UEN=0;       //TX RX - используем, а вс€кие CTS RTS - нет    
+#ifdef USART_9bit
+	U1MODEbits.PDSEL=3;     //9bit no parity
+#else
 	U1MODEbits.PDSEL=0;     //8bit четность выкл.
+#endif
 	U1MODEbits.STSEL=0;     //1 стоп бит
 	U1MODEbits.URXINV=0;    //UxRX Idle state is С1Т
 		 
@@ -61,17 +75,20 @@ void UsartInit(void)
 
 
 /////////////////////////////////////
-void UsartTxByteX(char data)
+void UsartTxByteX(char data, char bit9)
 {
-
+	unsigned short val;
 	while(U1STAbits.UTXBF==1); //ждем окончани€ отправки предыдущих данных
-	U1TXREG = data;
+	
+	val = data | (bit9 << 8);
+
+	U1TXREG = val;
  
 }
 
-
+#if 0
 ///////////////////////////////////
-char UsartRxByte(unsigned char *data)
+char UsartRxByte(unsigned short *data)
 //принимает байт, таймаут 13-26мсек
 //возвращает 1, в случае ошибки, 0 если все успешно
 {
@@ -105,11 +122,11 @@ char UsartRxByte(unsigned char *data)
 
 	return (0);                     // Return the received data
 }
-
+#endif
 
 
 ///////////////////////////////////
-char UsartRxByte_withTimeout(unsigned char *data)  //используетс€ только мастером
+char UsartRxByte_withTimeout(unsigned short *data)  //используетс€ только мастером
 //принимает байт, таймаут 13-26мсек
 //возвращает 1, в случае ошибки, 0 если все успешно
 {

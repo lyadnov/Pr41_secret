@@ -117,14 +117,9 @@
 //---------типы--------------------
 
 //---------переменные--------------
-extern unsigned int stat_modbus_all_frame;
-	extern unsigned int stat_usart_frame_bad;  //пришли данные не той длинны что ожидали получить
-	//modbus_stat_frame_bad;  //пришли данные не той длинны что ожидали получить
-		//unsigned int stat_usart_error_timout=0;
-		//unsigned int stat_usart_error_frame=0;
-		//unsigned int stat_usart_error_parity=0;
-		//unsigned int stat_usart_error_overrun=0;
-	extern unsigned int stat_usart_frame_good;
+extern unsigned int stat_modbus_frame_all;
+	extern unsigned int stat_modbus_usart_bad;  //пришли данные не той длинны что ожидали получить
+	extern unsigned int stat_modbus_usart_good;
 		extern unsigned int stat_modbus_frame_error_slave_addr;
 		extern unsigned int stat_modbus_frame_error_func;
 		extern unsigned int stat_modbus_frame_error_crc;

@@ -1,9 +1,6 @@
 #ifndef _MODBUS_MASTER_INCLUDED
 #define _MODBUS_MASTER_INCLUDED
 
-
-
-
 //---------константы---------------
 #define NULL 0
 
@@ -22,8 +19,6 @@ typedef struct {
 
 
 //----------функции----------------
-//void modbus_master_loop(void);
-//int modbus_master(Mbm_frame Mbframe,int data_out[], int data_in[],void *ptrfoncsnd, void *ptrfoncrcv);
 int modbus_master_read_reg(unsigned char slave_addr, unsigned short reg_addr, unsigned short num, unsigned short *buf_in);
 int modbus_master_write_reg(unsigned char slave_addr, unsigned short reg_addr, unsigned short val);
 int modbus_master_write_reg_broadcast(unsigned short reg_addr, unsigned short val);

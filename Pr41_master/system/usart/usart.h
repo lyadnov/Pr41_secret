@@ -10,9 +10,11 @@
 //----------функции----------------
 void UsartInit(void);
 
-void UsartTxByteX(char data);
-char UsartRxByte(unsigned char *data);
-char UsartRxByte_withTimeout(unsigned char *data);
+void UsartTxByteX(char data, char bit9);
+#if 0
+char UsartRxByte(unsigned short *data);
+#endif
+char UsartRxByte_withTimeout(unsigned short *data);
 void UsartWaitForSilence(void);
 
 
