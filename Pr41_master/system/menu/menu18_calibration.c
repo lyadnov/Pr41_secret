@@ -349,10 +349,9 @@ void menu18_2_plus(void)
         //1..9 ый датчик давления воды
         if(k_m18>K_MAX_VALUE) k_m18=K_MIN_VALUE;
       }
-      
-      
+
       modbus_master_write_reg(slave_m18,REG_CONFIG_K1+sensor_m18,k_m18);
-      //if(!modbus_master_write_reg(slave_m18,REG_CONFIG_K1+sensor_m18,k_m18)) //dml!!! вот здесь возможно надо прикрутить проверку, записались ли данные
+      //if(!modbus_master_write_reg(slave_m18,REG_CONFIG_K1+sensor_m18,k_m18)) //здесь возможно надо прикрутить проверку, записались ли данные
       //{
       //  //успешно записали данные
       //  menu_float_variable_out(2,13,val_m18,2,3);
@@ -362,9 +361,6 @@ void menu18_2_plus(void)
         //ошибка  
         //k_m18=33333;
       //}
-  
-        
-        
       break;
   }
   cursor_m18.count=0;

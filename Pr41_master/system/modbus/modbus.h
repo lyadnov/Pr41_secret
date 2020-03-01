@@ -1,6 +1,7 @@
 #ifndef _MODBUS_INCLUDED
 #define _MODBUS_INCLUDED
 
+
 //---------константы---------------
 #define USART_MASTER_RX_TIMEOUT        500     //3,2мс=500*6.4мкс(=1такт TMR8 при делителе 1:256) параметр нужен при работе мастера с компом
 #define USART_MODBUS_ERROR_PAUSE       47      //300мкс в случае любой ошибки ждем тишины в линии этот интервал времени
@@ -68,6 +69,7 @@
 #define REG_ERROR_USART_FRAME           0x20
 #define REG_ERROR_USART_PARITY          0x21
 #define REG_ERROR_USART_OVERRUN         0x22
+#define REG_ERROR_USART_9BIT            0x23
 //текущие значения с датчиков
 #define REG_SENSOR1_CURRENT_VALUE       0x30 //датчик давления 1
 #define REG_SENSOR2_CURRENT_VALUE       0x31
@@ -119,6 +121,7 @@
 //---------переменные--------------
 extern unsigned int stat_modbus_frame_all;
 	extern unsigned int stat_modbus_usart_bad;  //пришли данные не той длинны что ожидали получить
+		extern unsigned int stat_modbus_usart_bad_9bit;
 	extern unsigned int stat_modbus_usart_good;
 		extern unsigned int stat_modbus_frame_error_slave_addr;
 		extern unsigned int stat_modbus_frame_error_func;

@@ -14,44 +14,6 @@ unsigned short cfg_start_pause;
 unsigned short cfg_measure_interval;
 unsigned short cfg_k[NUMBER_OF_SENSORS];
 
-///////////////////////////////////
-void modbus_init(void)
-{
-	int i;
-	
-	//ножки
-
-	//переменные EEPROM
-	cfg_slave_addr=eeprom_read(ADDR_EEPROM_SLAVE_ADDR);
-	eeprom_read_buf(ADDR_EEPROM_START_PAUSE,(unsigned char*)&cfg_start_pause,2);
-	eeprom_read_buf(ADDR_EEPROM_MEASURE_INTERVAL,(unsigned char*)&cfg_measure_interval,2);
-	for(i=0;i<NUMBER_OF_SENSORS;i++)
-	{
-		eeprom_read_buf(ADDR_EEPROM_K1+i*2,(unsigned char*)&cfg_k[i],2);
-	}
-
-	//регистры MODBUS
-	for(i=0;i<TOTAL_REG_NUM;i++) slave_regs[i]=0;
-	slave_regs[REG_MAGIC]=0x1234;
-	slave_regs[REG_CONFIG_SLAVE_ADDR]=cfg_slave_addr;
-	slave_regs[REG_CONFIG_START_PAUSE]=cfg_start_pause;
-	slave_regs[REG_CONFIG_MEASURE_INTERVAL]=cfg_measure_interval;
-	for(i=0;i<NUMBER_OF_SENSORS;i++)
-	{
-		slave_regs[REG_CONFIG_K1+i]=cfg_k[i];
-	}
-
-	//регистры pmode
-	slave_regs[REG_CONFIG_PMODE] = cfg_pmode;
-	for (i = 0; i < NUMBER_OF_P2_INTERVALS; i++)
-	{
-		slave_regs[REG_CONFIG_P2_INTERVAL1 + i] = cfg_p2_intervals[i];
-	}
-
-	//прерывания
-
-	return;
-}
 
 ///////////////////////////////////
 void modbus_eeprom_write_default_values(void)
@@ -281,4 +243,43 @@ void modbus_start_full_measurement(void)
 		}
 	 
 		return;
+}
+
+///////////////////////////////////
+void modbus_init(void)
+{
+	int i;
+	
+	//ножки
+
+	//переменные EEPROM
+	cfg_slave_addr=eeprom_read(ADDR_EEPROM_SLAVE_ADDR);
+	eeprom_read_buf(ADDR_EEPROM_START_PAUSE,(unsigned char*)&cfg_start_pause,2);
+	eeprom_read_buf(ADDR_EEPROM_MEASURE_INTERVAL,(unsigned char*)&cfg_measure_interval,2);
+	for(i=0;i<NUMBER_OF_SENSORS;i++)
+	{
+		eeprom_read_buf(ADDR_EEPROM_K1+i*2,(unsigned char*)&cfg_k[i],2);
+	}
+
+	//регистры MODBUS
+	for(i=0;i<TOTAL_REG_NUM;i++) slave_regs[i]=0;
+	slave_regs[REG_MAGIC]=0x1234;
+	slave_regs[REG_CONFIG_SLAVE_ADDR]=cfg_slave_addr;
+	slave_regs[REG_CONFIG_START_PAUSE]=cfg_start_pause;
+	slave_regs[REG_CONFIG_MEASURE_INTERVAL]=cfg_measure_interval;
+	for(i=0;i<NUMBER_OF_SENSORS;i++)
+	{
+		slave_regs[REG_CONFIG_K1+i]=cfg_k[i];
+	}
+
+	//регистры pmode
+	slave_regs[REG_CONFIG_PMODE] = cfg_pmode;
+	for (i = 0; i < NUMBER_OF_P2_INTERVALS; i++)
+	{
+		slave_regs[REG_CONFIG_P2_INTERVAL1 + i] = cfg_p2_intervals[i];
+	}
+
+	//прерывания
+
+	return;
 }

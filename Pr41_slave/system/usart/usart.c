@@ -3,87 +3,63 @@
 #include "system\modbus\modbus.h"
 #include "system\usart\usart.h"
 
-//----------константы-------------- 
 //#define USART_19200
 #define USART_115200
 #define USART_9bit
 
-//---------переменные--------------
-unsigned int stat_usart_error_timout=0;
-unsigned int stat_usart_error_frame=0;
-unsigned int stat_usart_error_parity=0;
-unsigned int stat_usart_error_overrun=0;
+unsigned int stat_usart_error_timout = 0;
+unsigned int stat_usart_error_frame = 0;
+unsigned int stat_usart_error_parity = 0;
+unsigned int stat_usart_error_overrun = 0;
 
-
-//----------функции----------------
-
-//--------------------------основная часть-------------------------------------------
-
-
-///////////////////////////////////
-void UsartInit(void)
+void rs485_send_on(void)
 {
-	//ножки
-	TRISFbits.TRISF2=1;     //RX
-	TRISFbits.TRISF3=0;     //TX
-	
-	TRISBbits.TRISB15=0;    //управляем выходом 1=TX 0=RX
-
-	//модуль usart
-#ifdef USART_19200
-	U1MODEbits.BRGH=1;       //High Baud Rate Enable bit
-	U1BRG=520;               //19193бит/сек= (40*1000*1000Гц)/(4*(520+1))  
-#elif defined USART_115200
-	/* USART speed 115200 */
-	U1MODEbits.BRGH=1;       //High Baud Rate Enable bit
-	U1BRG=86;                //115200бит/сек= (40*1000*1000Гц)/(4*(86+1))  
-	//U1MODEbits.BRGH=0;     //High Baud Rate Enable bit
-	//U1BRG=21;              //115200бит/сек: 113636бит/сек=(40*1000*1000Гц)/(16*(86+1))  
-#else
-	Error!
-#endif
-	
-	U1MODEbits.UEN=0;       //TX RX - используем, а всякие CTS RTS - нет    
-#ifdef USART_9bit
-	U1MODEbits.PDSEL=3;     //9bit no parity
-#else
-	U1MODEbits.PDSEL=0;     //8bit четность выкл.
-#endif
-	U1MODEbits.STSEL=0;     //1 стоп бит
-	U1MODEbits.URXINV=0;    //UxRX Idle state is ‘1’
+	PORTBbits.RB15 = 1; //управляем приёмо-передатчиком: разрешаем запись данных в линию
 		 
-	//прерывания
-	U1STAbits.URXISEL=0;    //прерывание по каждому пришедшему байту
-	U1STAbits.UTXISEL0=0;    //?
-	U1STAbits.UTXISEL1=0;
-	IPC2bits.U1RXIP=4;  //приоритет прерывания =4
-	IPC3bits.U1TXIP=4;  //приоритет прерывания =4
-	IPC16bits.U1EIP=4;  //приоритет прерывания =4
-	IEC0bits.U1TXIE=0;  //прерывания на передачу запрещены
-	IEC0bits.U1RXIE=0;  //прерывания на прием запрещены
-	IEC4bits.U1EIE=0;   //прерывания по ошибке запрещены
-		
-	U1MODEbits.UARTEN=1;    //UART1 is enabled
-	U1STAbits.UTXEN=1;      //Transmit Enable
-
-	IFS0bits.U1TXIF=0;  //на всякий случай сбрасываем флаг прерывания      
-	IFS0bits.U1RXIF=0;
-	IFS4bits.U1EIF=0;
-	
-	 return;
+	//пауза 400мкс, чтобы помехи после включения приёмо-передачтика затухли + стандартная пауза между Modbus пакетами
+	T8CON = 0;
+	T8CONbits.TCS = 0;            //Timer8 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
+	T8CONbits.TCKPS = 3;          //1:256  1такт=25*256нс=6.4мкс
+	PR8 = USART_MODBUS_PAUSE;     //=400мкс
+	TMR8 = 0;
+	IFS3bits.T8IF = 0; //сбрасываем флаг
+	T8CONbits.TON = 1; //включаем таймер 8
+	while (IFS3bits.T8IF == 0);
 }
 
 
-/////////////////////////////////////
-void UsartTxByteX(char data, char bit9)
+void rs485_send_off(void)
+{
+	unsigned char data;
+
+	while (U1STAbits.TRMT == 0); //ждем опустошения сдвигового регистра
+
+	PORTBbits.RB15 = 0; //управляем приёмо-передатчиком: запрещаем запись данных в линию
+
+	//вычищаем RX данные, т.к при отправке они заворачиваются, надо просто 4 раза RX считать.
+	data = U1RXREG;  //сдвиговый RX буфер для USART, имеет размер 4 байта
+	data = U1RXREG;  //поэтому вычитываем 4 байта,которые зеркально прилетают обратно при любых TX транзакциях
+	data = U1RXREG;
+	data = U1RXREG;
+}
+
+
+static void rs485_init(void)
+{
+	TRISBbits.TRISB15 = 0; //ножка RB15 на выход
+	PORTBbits.RB15 = 0;    //управляем приёмо-передатчиком: запрещаем запись данных в линию
+}
+
+
+
+void UsartTxByteX(unsigned char data,unsigned char bit9)
 {
 	unsigned short val;
-	while(U1STAbits.UTXBF==1); //ждем окончания отправки предыдущих данных
+	while (U1STAbits.UTXBF==1); //ждем окончания отправки предыдущих данных
 	
-	val = data | (bit9 << 8);
+	val = ((unsigned short)data) | (((unsigned short)bit9) << 8);
 
 	U1TXREG = val;
- 
 }
 
 
@@ -125,7 +101,6 @@ char UsartRxByte(unsigned short *data)
 
 
 #if 0
-///////////////////////////////////
 char UsartRxByte_withTimeout(unsigned short *data)  //используется только мастером
 //принимает байт, таймаут 13-26мсек
 //возвращает 1, в случае ошибки, 0 если все успешно
@@ -185,7 +160,6 @@ char UsartRxByte_withTimeout(unsigned short *data)  //используется только мастер
 }
 #endif
 
-///////////////////////////////////
 void UsartWaitForSilence(void)
 //функция ждет пока в линни не наступит тишина длительностью 3.5символа
 //3.5символа= ( 1сек / ((115200бит_сек/10бит_в_байте)) )*3.5 = 300мкс
@@ -227,5 +201,58 @@ void UsartWaitForSilence(void)
 		}
 	}while(1);    
 
+}
+
+
+void UsartInit(void)
+{
+	rs485_init();
+
+	//ножки
+	TRISFbits.TRISF2 = 1;    //RX
+	TRISFbits.TRISF3 = 0;    //TX
+	
+	//модуль usart
+#ifdef USART_19200
+	U1MODEbits.BRGH=1;       //High Baud Rate Enable bit
+	U1BRG=520;               //19193бит/сек= (40*1000*1000Гц)/(4*(520+1))  
+#elif defined USART_115200
+	/* USART speed 115200 */
+	U1MODEbits.BRGH=1;       //High Baud Rate Enable bit
+	U1BRG=86;                //115200бит/сек= (40*1000*1000Гц)/(4*(86+1))  
+	//U1MODEbits.BRGH=0;     //High Baud Rate Enable bit
+	//U1BRG=21;              //115200бит/сек: 113636бит/сек=(40*1000*1000Гц)/(16*(86+1))  
+#else
+	Error!
+#endif
+	
+	U1MODEbits.UEN=0;       //TX RX - используем, а всякие CTS RTS - нет    
+#ifdef USART_9bit
+	U1MODEbits.PDSEL=3;     //9bit no parity
+#else
+	U1MODEbits.PDSEL=0;     //8bit четность выкл.
+#endif
+	U1MODEbits.STSEL=0;     //1 стоп бит
+	U1MODEbits.URXINV=0;    //UxRX Idle state is ‘1’
+		 
+	//прерывания
+	U1STAbits.URXISEL=0;    //прерывание по каждому пришедшему байту
+	U1STAbits.UTXISEL0=0;    //?
+	U1STAbits.UTXISEL1=0;
+	IPC2bits.U1RXIP=4;  //приоритет прерывания =4
+	IPC3bits.U1TXIP=4;  //приоритет прерывания =4
+	IPC16bits.U1EIP=4;  //приоритет прерывания =4
+	IEC0bits.U1TXIE=0;  //прерывания на передачу запрещены
+	IEC0bits.U1RXIE=0;  //прерывания на прием запрещены
+	IEC4bits.U1EIE=0;   //прерывания по ошибке запрещены
+		
+	U1MODEbits.UARTEN=1;    //UART1 is enabled
+	U1STAbits.UTXEN=1;      //Transmit Enable
+
+	IFS0bits.U1TXIF=0;  //на всякий случай сбрасываем флаг прерывания      
+	IFS0bits.U1RXIF=0;
+	IFS4bits.U1EIF=0;
+	
+	return;
 }
 

@@ -10,75 +10,65 @@ unsigned char frame_out[256];
 unsigned char frame_in[256];
 
 
-static int Csm_get_data(unsigned short len)
+static int modbus_receive_frame(unsigned short len_in)
 //0=ошибка 1=ок 
 {
 	int i;
 	unsigned short read_data;
 
-	for (i = 0; i < len; i++)
+	for (i = 0; i < len_in; i++)
 	{
 		if (!UsartRxByte_withTimeout(&read_data))
+		{
+			if (i == 0)
+			{
+				//в 0-вом байте ответа от слейва должна быть 1 в 9-ом бите
+				if ((read_data & 0xFF00) != 0x0100)
+				{
+					stat_modbus_usart_bad_9bit++;
+					stat_modbus_usart_bad++;
+					return 0;
+				}
+			}
+			else
+			{
+				//в остальных байтах ответа от слейва должен быть 0 в 9-ом бите
+				if (read_data & 0xFF00)
+				{
+					stat_modbus_usart_bad_9bit++;
+					stat_modbus_usart_bad++;
+					return 0;
+				}
+			}
 			frame_in[i] = read_data & 0xFF;
+		}
 		else
+		{
+			stat_modbus_usart_bad++;
 			return 0;
+		}
 	}
 
+	stat_modbus_usart_good++;
 	return 1;
 }
 
 
-static void Csm_send(unsigned short len_out) //для широковещательных пакетов
+static void modbus_send_frame(unsigned short len_out) //для широковещательных пакетов
 {
 	int i;
-	unsigned char data;
 
-	/////////////////
-	PORTBbits.RB15 = 1; //управляем приёмо-передатчиком: разрешаем запись данных в линию
-		 
-	//пауза 400мкс, чтобы помехи после включения приёмо-передачтика затухли + стандартная пауза между Modbus пакетами
-	T8CON = 0;
-	T8CONbits.TCS = 0;            //Timer8 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
-	T8CONbits.TCKPS = 3;          //1:256  1такт=25*256нс=6.4мкс
-	PR8 = USART_MODBUS_PAUSE;     //=400мкс
-	TMR8 = 0;
-	IFS3bits.T8IF = 0; //сбрасываем флаг
-	T8CONbits.TON = 1; //включаем таймер 8
-	while (IFS3bits.T8IF == 0);
-	////////////////
+	stat_modbus_frame_all++;
 	
-	for (i = 0; i < len_out; i++)
+	rs485_send_on();
+
+	UsartTxByteX(frame_out[0], 1); //в нулевом кадре фрейма(=посылки) 9ый бит равен 1, в остальных кадрах 0.
+	for (i = 1; i < len_out; i++)
 		UsartTxByteX(frame_out[i], 0);
 
-	//////////////////////////////
-	while (U1STAbits.TRMT == 0); //ждем опустошения сдвигового регистра
-
-	PORTBbits.RB15 = 0; //управляем приёмо-передатчиком: запрещаем запись данных в линию
-
-	//вычищаем RX данные, т.к при отправке они заворачиваются, надо просто 4 раза RX считать.
-	data = U1RXREG;  //сдвиговый RX буфер для USART, имеет размер 4 байта
-	data = U1RXREG;  //поэтому вычитываем 4 байта,которые зеркально прилетают обратно при любых TX транзакциях
-	data = U1RXREG;
-	data = U1RXREG;
-	//////////////////////////
-
-	return;
-}
-
-
-static int Csm_send_and_get_result(unsigned short len_out, unsigned short len_in)
-//0=ошибка 1=ок 
-{
-	int ret;
+	rs485_send_off();
 	
-	stat_modbus_frame_all++;
-	Csm_send(len_out);
-	ret = Csm_get_data(len_in);
-	if (ret)
-		stat_modbus_usart_good++;
-	else
-		stat_modbus_usart_bad++;
-	return ret;
+	return;
 }
 
 
@@ -108,13 +98,14 @@ static int modbus_master_write_reg_ext(Mbm_frame Mbframe, unsigned short data_ou
 	if (slave == MODBUS_BROADCAST_ADDR)
 	{
 		//широковещательный пакет, поэтому ответа от слейва не дожидаемся
-		Csm_send(len_out);
+		modbus_send_frame(len_out);
 		return 0;
 	}
 
 	len_in = 8;
 
-	if (!Csm_send_and_get_result(len_out, len_in)) //dml:len_out=сколько отправляем len_in=сколько ожидаем принять
+	modbus_send_frame(len_out);
+	if (!modbus_receive_frame(len_in))
 		return -3;  /* timeout error */
 
 	if (frame_in[0] != slave)
@@ -172,7 +163,8 @@ static int modbus_master_read_reg_ext(Mbm_frame Mbframe, unsigned short data_in[
 
 	len_in = 5 + (frame_len * 2); //5 = slave_addr(1) + func(1) + len(1) + crc(2)
 
-	if (!Csm_send_and_get_result(len_out, len_in)) //dml:len_out = сколько отправляем len_in = сколько ожидаем принять
+	modbus_send_frame(len_out);
+	if (!modbus_receive_frame(len_in))
 		return -3;  /* timeout error */
 
 	if (frame_in[0] != slave)

@@ -57,7 +57,6 @@
 #define REG_CONFIG_K8                   (REG_CONFIG_K1+7) 
 #define REG_CONFIG_K9                   (REG_CONFIG_K1+8) 
 #define REG_CONFIG_K10                  (REG_CONFIG_K1+9) //калибровочный коэффициент для 10го датчика
-
 //статистика Modbus
 #define REG_STAT_TOTAL_FRAME_NUM        0x10
 #define REG_STAT_SLAVE_ADDR_MISMATCH    0x11
@@ -70,6 +69,7 @@
 #define REG_ERROR_USART_FRAME           0x20
 #define REG_ERROR_USART_PARITY          0x21
 #define REG_ERROR_USART_OVERRUN         0x22
+#define REG_ERROR_USART_9BIT            0x23
 //текущие значения с датчиков
 #define REG_SENSOR1_CURRENT_VALUE       0x30 //датчик давления 1
 #define REG_SENSOR2_CURRENT_VALUE       0x31

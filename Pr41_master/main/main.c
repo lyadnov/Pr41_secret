@@ -34,7 +34,7 @@ int main(void)
 
 	do
 	{
-		res = modbus_master_read_reg(1 ,REG_MAGIC, 1, &test);
+		res = modbus_master_read_reg(1 ,REG_MAGIC, 1, &test); //dml!!! для отладки удалить.
 		Nop();
 		Nop();
 		Nop();
