@@ -4,15 +4,7 @@
 #include "system\flash\flash.h"
 #include "system\eeprom\eeprom.h"
 
-//---------переменные--------------
 
-
-//----------функции----------------
-
-//--------------------------основная часть-------------------------------------------
-
-
-///////////////////////////////////
 unsigned char eeprom_read(unsigned char addr)
 {
 	unsigned long temp;
@@ -41,18 +33,18 @@ unsigned char eeprom_read(unsigned char addr)
 	return(result);
 }
 
-///////////////////////////////////
-void eeprom_read_buf(unsigned char addr,unsigned char *buf,unsigned char size)
+
+void eeprom_read_buf(unsigned char addr, unsigned char *buf, unsigned char size)
 {
 	unsigned int i;
-	
-	for(i=0;i<size;i++)
-		buf[i]=eeprom_read(addr+i);
-	
+
+	for(i = 0; i < size; i++)
+		buf[i] = eeprom_read(addr + i);
+
 	return;
 }
 
-///////////////////////////////////
+
 void eeprom_write_byte(unsigned char addr,unsigned char data)
 {
 	unsigned int i;
@@ -81,14 +73,14 @@ void eeprom_write_byte(unsigned char addr,unsigned char data)
 	return;
 }
 
-///////////////////////////////////
+
 void eeprom_write_word(unsigned char addr,unsigned short data)
 {
 	eeprom_write_buf(addr,(unsigned char*)&data,2);
 	return;
 }
 
-///////////////////////////////////
+
 void eeprom_write_buf(unsigned char addr,unsigned char *buf,unsigned char size)
 {
 	unsigned int i;

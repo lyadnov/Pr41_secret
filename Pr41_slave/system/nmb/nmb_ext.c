@@ -3,6 +3,8 @@
 #include "system\adc\adc.h"
 #include "system\eeprom\eeprom.h"
 
+unsigned short nmb_k[NMB_NUMBER_OF_SENSORS];
+
 int nmb_mode;
 int nmb_error;
 unsigned int nmb_clock_ms; //in ms
@@ -42,6 +44,39 @@ typedef struct {
 		unsigned char byte;
 	};
 } NMB_CONFIG;
+
+typedef struct {
+	union {
+		struct {
+			unsigned char is_change:1;       //0
+			unsigned char Ubi:1;
+			unsigned char Tbz:1;
+			unsigned char Tbtr:1;
+			unsigned char Tne:1;
+			unsigned char Hne:1;
+			unsigned char Pne:1;
+			unsigned char U:1;               //7
+		};
+		unsigned char byte;
+	};
+} NMB_K_SET_CONFIG;
+
+
+typedef struct {
+	union {
+		struct {
+			unsigned char is_change:1;       //0
+			unsigned char not_used1:1;
+			unsigned char not_used2:1;
+			unsigned char not_used3:1;
+			unsigned char not_used4:1;
+			unsigned char not_used5:1;
+			unsigned char ok:1;
+			unsigned char not_used6:1;       //7
+		};
+		unsigned char byte;
+	};
+} NMB_K_SET_STATUS;
 
 
 static void nmb_timer2_stop(void)
@@ -236,11 +271,70 @@ static void nmb_timer_start(void)
 }
 
 
+static int nmb_set_k(unsigned char *data_in, unsigned char size_in, unsigned char *data_out, unsigned char *size_out)
+{
+	NMB_K_SET_CONFIG config;
+	NMB_K_SET_STATUS status;
+	unsigned short k_in;
+	int index;
+	unsigned long temp;
+
+	if (size_in != 0x04)
+	{
+		stat_nmb_frame_format_error++;
+		return 1;
+	}
+	config.byte = data_in[1];
+	if (config.Ubi)
+		index = 0;
+	else if (config.Tbz)
+		index = 1;
+	else if (config.Tbtr)
+		index = 2;
+	else if (config.Tne)
+		index = 3;
+	else if (config.Hne)
+		index = 4;
+	else if (config.Pne)
+		index = 5;
+	else if (config.U)
+		index = 6;
+	else
+		return 1;
+
+	k_in = *((unsigned short*)&data_in[2]);	
+	if (k_in != 0x00)
+	{
+		nmb_k[index] = k_in;
+		//dml!!! добавить проверку на допустимые значения в k_in
+		if (config.is_change == 0)
+			eeprom_write_word(ADDR_EEPROM_K1 + index * 2, nmb_k[index]);
+	}
+
+	data_out[0] = NBM_CMD_SET_K_RESPONSE;
+	
+	status.byte = 0x00;
+	status.is_change = config.is_change;
+	status.ok = 1; //dml!!!
+	data_out[1] = status.byte;
+	
+	*((unsigned short*)&data_out[2]) = nmb_k[index];
+	
+	temp = ADC_get(index);
+	temp = (temp * nmb_k[index]) / 4095;
+	*((unsigned short*)&data_out[4]) = temp;
+
+	*size_out = 6;
+	
+	return 0;
+}
+
+
 static int nmb_get_status_ext(unsigned char cmd, unsigned char *data_out, unsigned char *size_out)
 {
 	NMB_STATUS status;
 	int i;
-	unsigned short temp;
+	unsigned long temp;
 
 	status.sv_supply_bz = PORTDbits.RD9;
 	status.sv_supply_gvi = PORTDbits.RD10;
@@ -256,7 +350,13 @@ static int nmb_get_status_ext(unsigned char cmd, unsigned char *data_out, unsign
 	for (i = 0; i < NMB_NUMBER_OF_SENSORS; i++)
 	{
 		temp = ADC_get(i);
-		//temp = (temp * NMB_K) / 4095; //FIXME: use real K here
+		//алгоритм калибровочного коэффициента:
+		//есть 
+		//АЦП           0..4095
+		//Давление, мАтм  0..16000 = это и есть К, т.е K=это максимальное давление в мАтм, соответсвующее максимальному АЦП=4095
+		//текущее значение мАтм = текАЦП*К(2байта)/4095
+		//т.е на мастер передаем значение в мАтм, а мастер делит на 1000 и выводит на экран в Атм
+		temp = (temp * nmb_k[i]) / 4095;
 		*((unsigned short*)&data_out[2 + i * 2]) = temp;
 	}
 
@@ -472,6 +572,9 @@ int nmb_process_data(unsigned char *data_in, unsigned char size_in,
 			return nmb_protection_reset(size_in, data_out, size_out);
 		case NBM_CMD_GET_SERIAL_NUMBER_REQUEST:
 			return nmb_get_serial_number(size_in, data_out, size_out);
+		case NBM_CMD_SET_K_REQUEST:
+			//смена калибровочного коэффициента
+			return nmb_set_k(data_in, size_in, data_out, size_out);
 		default:
 			stat_nmb_not_supported_error++;
 			return 1;
@@ -498,8 +601,14 @@ void nmb_eeprom_write_default_values(void)
 
 void nmb_ext_init(void)
 {
+	int i;
+	
 	nmb_mode = 0;
 	nmb_error = 0;
+
+	//переменные EEPROM
+	for(i = 0; i < NMB_NUMBER_OF_SENSORS; i++)
+		eeprom_read_buf(ADDR_EEPROM_K1 + i * 2, (unsigned char*)&nmb_k[i], 2);
 
 	//ножки на вход
 	TRISDbits.TRISD9 = 1;  //вход СВ(свидетель) вкл\выкл питания БЗ
