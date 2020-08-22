@@ -12,7 +12,6 @@ extern unsigned char error_num;
 //----------функции----------------
 void error_out(void);
 void oscillograph_out(unsigned short x);
-void reset(void);
 
 #endif
 

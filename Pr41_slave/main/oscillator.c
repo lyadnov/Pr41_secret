@@ -4,10 +4,10 @@
 #include "main\oscillator.h"
 
 
-//#define CLOCK_EXTERNAL_80MHZ_NOPLL //у меня мастер
+//#define CLOCK_EXTERNAL_80MHZ_NOPLL
 //#define CLOCK_EXTERNAL_80MHZ_PLL
-//#define CLOCK_EXTERNAL_10MHZ_PLL     //у бати на работе, у меня слейв
-#define CLOCK_EXTERNAL_20MHZ_PLL   //у бати на работе 2
+//#define CLOCK_EXTERNAL_10MHZ_PLL
+#define CLOCK_EXTERNAL_20MHZ_PLL
 //#define CLOCK_HS_2MHZ_PLL
 //#define CLOCK_HS_20MHZ_PLL
 //#define CLOCK_HS_20MHZ_NOPLL

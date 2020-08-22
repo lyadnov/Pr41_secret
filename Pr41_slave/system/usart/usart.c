@@ -1,13 +1,9 @@
 #include "main\p33FJ128GP706.h"
 #include "main\errors.h" 
-#include "system\modbus\modbus.h"
+#include "system\nmb\nmb.h"
 #include "system\usart\usart.h"
 
-//#define USART_19200
-#define USART_115200
-#define USART_9bit
-
-unsigned int stat_usart_error_timout = 0;
+//unsigned int stat_usart_error_timout = 0;
 unsigned int stat_usart_error_frame = 0;
 unsigned int stat_usart_error_parity = 0;
 unsigned int stat_usart_error_overrun = 0;
@@ -16,11 +12,11 @@ void rs485_send_on(void)
 {
 	PORTBbits.RB15 = 1; //управляем приёмо-передатчиком: разрешаем запись данных в линию
 		 
-	//пауза 400мкс, чтобы помехи после включения приёмо-передачтика затухли + стандартная пауза между Modbus пакетами
+	//пауза 400мкс, чтобы помехи после включения приёмо-передачтика затухли + пауза между nbm пакетами
 	T8CON = 0;
 	T8CONbits.TCS = 0;            //Timer8 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
 	T8CONbits.TCKPS = 3;          //1:256  1такт=25*256нс=6.4мкс
-	PR8 = USART_MODBUS_PAUSE;     //=400мкс
+	PR8 = USART_NMB_PAUSE;        //=400мкс
 	TMR8 = 0;
 	IFS3bits.T8IF = 0; //сбрасываем флаг
 	T8CONbits.TON = 1; //включаем таймер 8
@@ -51,7 +47,6 @@ static void rs485_init(void)
 }
 
 
-
 void UsartTxByteX(unsigned char data,unsigned char bit9)
 {
 	unsigned short val;
@@ -63,8 +58,7 @@ void UsartTxByteX(unsigned char data,unsigned char bit9)
 }
 
 
-///////////////////////////////////
-char UsartRxByte(unsigned short *data)
+char UsartRxByte(unsigned short *data) //dml!!! добавить таймаут
 //принимает байт, таймаут 13-26мсек
 //возвращает 1, в случае ошибки, 0 если все успешно
 {
@@ -75,15 +69,13 @@ char UsartRxByte(unsigned short *data)
 	if(U1STAbits.FERR)                 // If a framing error occured
 	{
 		*data = U1RXREG; 
-		//error_num=err_UsartRxFrameError;
-		slave_regs[REG_ERROR_USART_FRAME]++;
+		stat_usart_error_frame++;
 		return(1);
 	}
-	if(U1STAbits.PERR)                 // If a framing error occured
+	if(U1STAbits.PERR)                 // If a parity error occured
 	{
 		*data = U1RXREG; 
-		//error_num=err_UsartRxParityError;
-		 slave_regs[REG_ERROR_USART_PARITY]++; 
+		 stat_usart_error_parity++;
 		return(1);
 	}
 
@@ -92,115 +84,53 @@ char UsartRxByte(unsigned short *data)
 	if(U1STAbits.OERR)                 //переполнение буфера
 	{ 
 		U1STAbits.OERR=0;
-		slave_regs[REG_ERROR_USART_OVERRUN]++; 
+		stat_usart_error_overrun++;
 		return(1);   
 	}
 
 	return (0);                     // Return the received data
 }
 
-
-#if 0
-char UsartRxByte_withTimeout(unsigned short *data)  //используется только мастером
-//принимает байт, таймаут 13-26мсек
-//возвращает 1, в случае ошибки, 0 если все успешно
-{
-	T8CON=0;
-	T8CONbits.TCS=0;        //Timer8 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
-	T8CONbits.TCKPS=3;      //1:256  1такт=25*256нс=6.4мкс
-	PR8=USART_MASTER_RX_TIMEOUT;   //=3.2мс сейчас
-	do
-	{
-		TMR8=0;
-		IFS3bits.T8IF=0; //сбрасываем флаг
-		T8CONbits.TON=1; //включаем таймер 8
-		while( (U1STAbits.URXDA==0)&&(IFS3bits.T8IF==0) );
-
-		if(U1STAbits.URXDA==0)
-		{
-			//выходим по таймауту
-			T8CONbits.TON=0; //выключаем таймер 8
-			stat_usart_error_timout++;
-			return(1); //ошибка таймаут
-		}
-		else
-		{
-			T8CONbits.TON=0; //выключаем таймер 8
-			break;
-		}
-	}while(1);
-
-	//проверяю что приняли данные без ошибок
-	if(U1STAbits.FERR)                 // If a framing error occured
-	{
-		*data = U1RXREG; 
-		//stat_usart_error_frame++;
-		slave_regs[REG_ERROR_USART_FRAME]++;
-		return(1);
-	}
-		if(U1STAbits.PERR)                 // If a parity error occured
-		{
-		*data = U1RXREG; 
-		//stat_usart_error_parity++;
-		slave_regs[REG_ERROR_USART_PARITY]++; 
-		return(1);
-	}
-
-	*data = U1RXREG; 
-
-	if(U1STAbits.OERR)                 //переполнение буфера
-	{ 
-		U1STAbits.OERR=0;
-		//stat_usart_error_overrun++;
-		slave_regs[REG_ERROR_USART_OVERRUN]++; 
-		return(1);   
-	}
-
-	return (0);                     // Return the received data
-}
-#endif
 
 void UsartWaitForSilence(void)
-//функция ждет пока в линни не наступит тишина длительностью 3.5символа
-//3.5символа= ( 1сек / ((115200бит_сек/10бит_в_байте)) )*3.5 = 300мкс
+//функция ждет пока в линни не наступит тишина длительностью 1.5 символа
+//1.5 символа = ( 1сек / ((19200бит_сек/11бит_в_байте)) )*1.5 = 860 мкс
 //внешний тактовый генератор 80Мгц  на TMR8 подается 80МГЦ/2 + делитель 256. 
 // Т.е увеличение TMR8 на 1 происходит раз в (1/80Мгц)*256= раз в 6,4мкс
-//поэтому после включения таймера пройдет период 300мкс/6.4мкс=47 и выставится флаг IFS3bits.T8IF
+//поэтому после включения таймера пройдет период 860мкс/6.4мкс=135 и выставится флаг IFS3bits.T8IF
 {
 	unsigned char data;
-		
 	
-	data=U1RXREG;  //сдвиговый RX буфер для USART, имеет размер 4 байта
-	data=U1RXREG;  //поэтому вычитываем 4 байта,которые зеркально прилетают обратно при любых TX транзакциях
-	data=U1RXREG;
-	data=U1RXREG;
+	data = U1RXREG;  //сдвиговый RX буфер для USART, имеет размер 4 байта
+	data = U1RXREG;  //поэтому вычитываем 4 байта,которые зеркально прилетают обратно при любых TX транзакциях
+	data = U1RXREG;
+	data = U1RXREG;
 
-	T8CON=0;
-	T8CONbits.TCS=0;            //Timer8 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
-	T8CONbits.TCKPS=3;          //1:256  1такт=25*256нс=6.4мкс
-	PR8=USART_MODBUS_ERROR_PAUSE;  //=300мкс
+	T8CON = 0;
+	T8CONbits.TCS = 0;            //Timer8 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
+	T8CONbits.TCKPS = 3;          //1:256  1такт=25*256нс=6.4мкс
+	PR8 = USART_NMB_ERROR_PAUSE;  //=860мкс
 
 	do
 	{
-		TMR8=0;
-		IFS3bits.T8IF=0; //сбрасываем флаг
-		T8CONbits.TON=1; //включаем таймер 8
-		while( (U1STAbits.URXDA==0)&&(IFS3bits.T8IF==0) );
+		TMR8 = 0;
+		IFS3bits.T8IF = 0; //сбрасываем флаг
+		T8CONbits.TON = 1; //включаем таймер 8
+		while ((U1STAbits.URXDA == 0) && (IFS3bits.T8IF == 0));
 				
-		if(U1STAbits.URXDA==0)
+		if (U1STAbits.URXDA == 0)
 		{
 			//нужная пауза без данных произошла
-			T8CONbits.TON=0; //выключаем таймер 8
+			T8CONbits.TON = 0; //выключаем таймер 8
 			return;
 		}
 		else
 		{
 			//данные пришли, а нужную паузу не выдержали - запускаем счетчик заново
-			data=U1RXREG;
-			if(U1STAbits.OERR) U1STAbits.OERR=0; //переполнение буфера
+			data = U1RXREG;
+			if (U1STAbits.OERR) U1STAbits.OERR = 0; //переполнение буфера
 		}
-	}while(1);    
-
+	} while(1);
 }
 
 
