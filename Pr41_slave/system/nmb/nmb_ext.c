@@ -44,20 +44,43 @@ typedef struct {
 } NMB_CONFIG;
 
 
-// #define INTERRUPT_PROTECT(x) { char saved_ipl; SET_AND_SAVE_CPU_IPL(saved_ipl,7); x; RESTORE_CPU_IPL(saved_ipl);} (void) 0;
-// void mutex_lock(char x)
-// {
-// 	char saved_ipl; 
-// 	SET_AND_SAVE_CPU_IPL(saved_ipl, 7); 
-// 	RESTORE_CPU_IPL(saved_ipl);
-// }
-
-
-void nmb_timer_stop(void)
+static void nmb_timer2_stop(void)
 {
-	IFS0bits.T1IF = 0;
-	IEC0bits.T1IE = 0;
+	T2CONbits.TON = 0;
+	IEC0bits.T2IE = 0;
+	IFS0bits.T2IF = 0;
+}
+
+
+void nmb_timer2_callback(void)
+{
+	if (PORTGbits.RG2 == 1) //вход Защ. БЗ  нет/сраб
+	{
+		PORTGbits.RG3 = 0; //сброс АЗ БЗ (0=нет сброса, 1=сброс)
+		nmb_timer2_stop();
+	}
+}
+
+
+static void nmb_timer2_start(void)
+{
+	T2CON = 0;
+	T2CONbits.TCS = 0;   //Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
+	T2CONbits.T32 = 0;   //16bit mode
+	T2CONbits.TCKPS = 2; //1:64
+	PR2 = 0x3D09;        //период = 25нс * 64 * 0x3D09 = 25мс
+	IPC1bits.T2IP = 5;    //приоритет прерывания = 5
+	IFS0bits.T2IF = 0;    //на всякий случай сбрасываем флаг прерывания 
+	IEC0bits.T2IE = 1;    //разрешаем прерывания от таймера2
+	T2CONbits.TON = 1;    //включаем таймер 2
+}
+
+
+static void nmb_timer_stop(void)
+{
 	T1CONbits.TON = 0;
+	IEC0bits.T1IE = 0;
+	IFS0bits.T1IF = 0;
 	nmb_clock_ms = 0;
 }
 
@@ -96,7 +119,6 @@ void nmb_timer_callback(void)
 				if (PORTDbits.RD10 == 0)
 				{
 					//СВ ГВИ включился
-					//dml!!! PORTDbits.RD8 = 0; //включение питания ГВИ
 					nmb_timer_stop();
 				}
 				else
@@ -106,7 +128,6 @@ void nmb_timer_callback(void)
 					{
 						//таймаут, ошибка
 						nmb_error = 1;
-						//dml!!! PORTDbits.RD8 = 0; //включение питания ГВИ
 						nmb_timer_stop();
 					}
 				}
@@ -188,12 +209,19 @@ void nmb_timer_callback(void)
 			}
 			break;
 		default:
+			nmb_timer_stop();
 			break;
 	}
 }
 
 
-void nmb_timer_start(void)
+static int nmb_timer_is_active(void)
+{
+	return T1CONbits.TON;
+}
+
+
+static void nmb_timer_start(void)
 {
 	nmb_clock_ms = 0;
 	nmb_timer_mode = nmb_mode;
@@ -201,10 +229,10 @@ void nmb_timer_start(void)
 	T1CONbits.TCS = 0;    //Timer1 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
 	T1CONbits.TCKPS = 2;  //1:64 
 	PR1 = 0x3D09;       //период = 25нс * 64 * 0x3D09 = 25мс
-	IPC0bits.T1IP=4;    //приоритет прерывания = 4
-	IFS0bits.T1IF=0;    //на всякий случай сбрасываем флаг прерывания 
-	IEC0bits.T1IE=1;    //разрешаем прерывания от таймера1
-	T1CONbits.TON=1;    //включаем таймер
+	IPC0bits.T1IP = 4;  //приоритет прерывания = 4
+	IFS0bits.T1IF = 0;  //на всякий случай сбрасываем флаг прерывания 
+	IEC0bits.T1IE = 1;  //разрешаем прерывания от таймера1
+	T1CONbits.TON = 1;  //включаем таймер
 }
 
 
@@ -244,14 +272,19 @@ static int nmb_set_mode3_discharging(unsigned char size_in, unsigned char *data_
 		stat_nmb_frame_format_error++;
 		return 1;
 	}
-	if (nmb_mode != 0)
+	if (nmb_timer_is_active() && (nmb_mode != 3))
+		return 1;
+	if ((nmb_mode != 0) && (nmb_mode != 3))
 		return 1;
 
 	//set outputs
-	PORTDbits.RD7 = 0; //включение БТР (0=включен 1=выключен)
-	nmb_timer_start();
+	if (nmb_mode == 0)
+	{
+		PORTDbits.RD7 = 0; //включение БТР (0=включен 1=выключен)
+		nmb_timer_start();
+	}
 
-	nmb_get_status_ext(0x11, data_out, size_out);
+	nmb_get_status_ext(NBM_CMD_MODE3_RESPONSE, data_out, size_out);
 	
 	nmb_mode = 3;
 
@@ -266,14 +299,19 @@ static int nmb_set_mode2_gvi(unsigned char size_in, unsigned char *data_out, uns
 		stat_nmb_frame_format_error++;
 		return 1;
 	}
-	if (nmb_mode != 0)
+	if (nmb_timer_is_active() && (nmb_mode != 2))
+		return 1;
+	if ((nmb_mode != 0) && (nmb_mode != 2))
 		return 1;
 
 	//set outputs
-	PORTDbits.RD8 = 1; //включение питания ГВИ
-	nmb_timer_start();
+	if (nmb_mode == 0)
+	{
+		PORTDbits.RD8 = 1; //включение питания ГВИ
+		nmb_timer_start();
+	}
 	
-	nmb_get_status_ext(0x11, data_out, size_out);
+	nmb_get_status_ext(NBM_CMD_MODE2_RESPONSE, data_out, size_out);
 
 	nmb_mode = 2;
 
@@ -290,7 +328,9 @@ static int nmb_set_mode1_charging(unsigned char *data_in, unsigned char size_in,
 		stat_nmb_frame_format_error++;
 		return 1;
 	}
-	if (nmb_mode != 0)
+	if (nmb_timer_is_active() && (nmb_mode != 1))
+		return 1;
+	if ((nmb_mode != 0) && (nmb_mode != 1))
 		return 1;
 
 	//set outputs
@@ -299,11 +339,13 @@ static int nmb_set_mode1_charging(unsigned char *data_in, unsigned char size_in,
 	PORTFbits.RF4 = config.I_bit0;
 	PORTFbits.RF5 = config.I_bit1;
 	PORTFbits.RF6 = config.I_bit2;
+	if (nmb_mode == 0)
+	{
+		PORTDbits.RD4 = 1; //включение питания БЗ
+		nmb_timer_start();
+	}
 
-	PORTDbits.RD4 = 1; //включение питания БЗ
-	nmb_timer_start();
-
-	nmb_get_status_ext(0x11, data_out, size_out);
+	nmb_get_status_ext(NBM_CMD_MODE1_RESPONSE, data_out, size_out);
 	
 	nmb_mode = 1;
 
@@ -318,26 +360,33 @@ static int nmb_set_mode0_stop(unsigned char size_in, unsigned char *data_out, un
 		stat_nmb_frame_format_error++;
 		return 1;
 	}
+	if (nmb_timer_is_active() && (nmb_mode != 0))
+		return 1;
+
+	nmb_error = 0;
 
 	//set outputs
-	switch (nmb_mode)
+	if (nmb_mode != 0)
 	{
-		case 1:
-			PORTBbits.RB14 = 0; //разрешение зарядки БИ
-			PORTDbits.RD5 = 1;  //выключение питания БЗ
-			break;
-		case 2:
-			PORTDbits.RD8 = 0; //включение питания ГВИ
-			break;
-		case 3:
-			PORTDbits.RD7 = 1; //выключение БТР (0=включен 1=выключен)
-			break;
-		default:
-			return 1; //dml!!! что делать, если nmb_mode = 0 ?
+		switch (nmb_mode)
+		{
+			case 1:
+				PORTBbits.RB14 = 0; //разрешение зарядки БИ
+				PORTDbits.RD5 = 1;  //выключение питания БЗ
+				break;
+			case 2:
+				PORTDbits.RD8 = 0; //включение питания ГВИ
+				break;
+			case 3:
+				PORTDbits.RD7 = 1; //выключение БТР (0=включен 1=выключен)
+				break;
+			default:
+				return 1;
+		}
+		nmb_timer_start();
 	}
-	nmb_timer_start();	
 
-	nmb_get_status_ext(0x11, data_out, size_out);
+	nmb_get_status_ext(NBM_CMD_MODE0_RESPONSE, data_out, size_out);
 	
 	nmb_mode = 0;
 	return 0;
@@ -354,8 +403,9 @@ static int nmb_protection_reset(unsigned char size_in, unsigned char *data_out, 
 
 	//set outputs
 	PORTGbits.RG3 = 1; //сброс АЗ БЗ (0=нет сброса, 1=сброс)
-	
-	nmb_get_status_ext(0x11, data_out, size_out);
+	nmb_timer2_start();
+
+	nmb_get_status_ext(NBM_CMD_PROTECTION_RESET_RESPONSE, data_out, size_out);
 
 	return 0;
 }
@@ -369,7 +419,7 @@ static int nmb_get_status(unsigned char size_in, unsigned char *data_out, unsign
 		return 1;
 	}
 
-	nmb_get_status_ext(0x12, data_out, size_out);
+	nmb_get_status_ext(NBM_CMD_STATUS_RESPONSE, data_out, size_out);
 
 	return 0;
 }
@@ -383,7 +433,7 @@ static int nmb_get_serial_number(unsigned char size_in, unsigned char *data_out,
 		return 1;
 	}
 
-	data_out[0] = 0x1F;
+	data_out[0] = NBM_CMD_GET_SERIAL_NUMBER_RESPONSE;
 	data_out[1] = 0x03;
 	data_out[2] = 0x00;
 	data_out[3] = 0x01;
@@ -403,24 +453,24 @@ int nmb_process_data(unsigned char *data_in, unsigned char size_in,
 {
 	switch (data_in[0])
 	{
-		case 0x02:
-			//Зярядка БИ
-			return nmb_set_mode1_charging(data_in, size_in, data_out, size_out);
-		case 0x03:
-			//Технологическая разрядка
-			return nmb_set_mode3_discharging(size_in, data_out, size_out);
-		case 0x04:
-			//работа на ГВИ
-			return nmb_set_mode2_gvi(size_in, data_out, size_out);
-		case 0x05:
+		case NBM_CMD_STATUS_REQUEST:
+			return nmb_get_status(size_in, data_out, size_out);
+		case NBM_CMD_MODE0_REQUEST:
 			//Промежуточный режим
 			return nmb_set_mode0_stop(size_in, data_out, size_out);
-		case 0x06:
+		case NBM_CMD_MODE1_REQUEST:
+			//Зярядка БИ
+			return nmb_set_mode1_charging(data_in, size_in, data_out, size_out);
+		case NBM_CMD_MODE2_REQUEST:
+			//работа на ГВИ
+			return nmb_set_mode2_gvi(size_in, data_out, size_out);
+		case NBM_CMD_MODE3_REQUEST:
+			//Технологическая разрядка
+			return nmb_set_mode3_discharging(size_in, data_out, size_out);
+		case NBM_CMD_PROTECTION_RESET_REQUEST:
 			//Сброс защиты БЗ
 			return nmb_protection_reset(size_in, data_out, size_out);
-		case 0x0A:
-			return nmb_get_status(size_in, data_out, size_out);
-		case 0x0F:
+		case NBM_CMD_GET_SERIAL_NUMBER_REQUEST:
 			return nmb_get_serial_number(size_in, data_out, size_out);
 		default:
 			stat_nmb_not_supported_error++;
