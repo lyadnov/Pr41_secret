@@ -1,17 +1,30 @@
 #include "p33FJ128GP706.h"
 #include "system\nmb\nmb.h"
+#include "system\nmb\nmb_low.h"
+#include "system\nmb\nmb_timer.h"
 #include "system\adc\adc.h"
 #include "system\eeprom\eeprom.h"
 
-unsigned short nmb_k[NMB_NUMBER_OF_SENSORS];
-
 int nmb_mode;
 int nmb_error;
-unsigned int nmb_clock_ms; //in ms
-unsigned int nmb_timer_mode;
 
-extern unsigned short stat_nmb_frame_format_error;
-extern unsigned short stat_nmb_not_supported_error;
+#define NBM_CMD_STATUS_REQUEST             0x0A
+#define NBM_CMD_STATUS_RESPONSE            0xF5
+#define NBM_CMD_MODE0_REQUEST              0x05 //stop
+#define NBM_CMD_MODE0_RESPONSE             0xFA
+#define NBM_CMD_MODE1_REQUEST              0x02 //зарядка БИ
+#define NBM_CMD_MODE1_RESPONSE             0xFD
+#define NBM_CMD_MODE2_REQUEST              0x04 //работа на ГВИ
+#define NBM_CMD_MODE2_RESPONSE             0xFB
+#define NBM_CMD_MODE3_REQUEST              0x03 //технологическая разрядка
+#define NBM_CMD_MODE3_RESPONSE             0xFC
+#define NBM_CMD_PROTECTION_RESET_REQUEST   0x06
+#define NBM_CMD_PROTECTION_RESET_RESPONSE  0xF9
+#define NBM_CMD_GET_SERIAL_NUMBER_REQUEST  0x0F
+#define NBM_CMD_GET_SERIAL_NUMBER_RESPONSE 0xF0
+#define NBM_CMD_SET_K_REQUEST              0x07
+#define NBM_CMD_SET_K_RESPONSE             0xF8
+
 
 typedef struct {
 	union {
@@ -77,198 +90,6 @@ typedef struct {
 		unsigned char byte;
 	};
 } NMB_K_SET_STATUS;
-
-
-static void nmb_timer2_stop(void)
-{
-	T2CONbits.TON = 0;
-	IEC0bits.T2IE = 0;
-	IFS0bits.T2IF = 0;
-}
-
-
-void nmb_timer2_callback(void)
-{
-	if (PORTGbits.RG2 == 1) //вход Защ. БЗ  нет/сраб
-	{
-		PORTGbits.RG3 = 0; //сброс АЗ БЗ (0=нет сброса, 1=сброс)
-		nmb_timer2_stop();
-	}
-}
-
-
-static void nmb_timer2_start(void)
-{
-	T2CON = 0;
-	T2CONbits.TCS = 0;   //Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
-	T2CONbits.T32 = 0;   //16bit mode
-	T2CONbits.TCKPS = 2; //1:64
-	PR2 = 0x3D09;        //период = 25нс * 64 * 0x3D09 = 25мс
-	IPC1bits.T2IP = 5;    //приоритет прерывания = 5
-	IFS0bits.T2IF = 0;    //на всякий случай сбрасываем флаг прерывания 
-	IEC0bits.T2IE = 1;    //разрешаем прерывания от таймера2
-	T2CONbits.TON = 1;    //включаем таймер 2
-}
-
-
-static void nmb_timer_stop(void)
-{
-	T1CONbits.TON = 0;
-	IEC0bits.T1IE = 0;
-	IFS0bits.T1IF = 0;
-	nmb_clock_ms = 0;
-}
-
-
-void nmb_timer_callback(void)
-{
-	nmb_clock_ms += 25;
-	
-	switch (nmb_timer_mode)
-	{
-		case 0:
-			if (nmb_mode == 1) //Зарядка БИ
-			{
-				//from mode0 to mode1
-				if (PORTDbits.RD9 == 0)
-				{
-					//СВ БЗ включился
-					PORTDbits.RD4 = 0; //включение питания БЗ
-					nmb_timer_stop();
-				}
-				else
-				{
-					//СВ БЗ не включился
-					if (nmb_clock_ms >= 1000)
-					{
-						//таймаут, ошибка
-						nmb_error = 1;
-						PORTDbits.RD4 = 0; //включение питания БЗ
-						nmb_timer_stop();
-					}
-				}
-			}
-			else if (nmb_mode == 2) //ГВИ
-			{
-				//from mode0 to mode2
-				if (PORTDbits.RD10 == 0)
-				{
-					//СВ ГВИ включился
-					nmb_timer_stop();
-				}
-				else
-				{
-					//СВ БЗ не включился
-					if (nmb_clock_ms >= 1000)
-					{
-						//таймаут, ошибка
-						nmb_error = 1;
-						nmb_timer_stop();
-					}
-				}
-			}
-			else if (nmb_mode == 3) //БТР
-			{
-				//from mode0 to mode3
-				if (PORTDbits.RD11 == 1)
-				{
-					//СВ БТР включился
-					nmb_timer_stop();
-				}
-				else
-				{
-					//СВ БЗ не включился
-					if (nmb_clock_ms >= 25)
-					{
-						//таймаут, ошибка
-						nmb_error = 1;
-						nmb_timer_stop();
-					}
-				}
-			}
-			break;
-		case 1:
-			//from mode1 to mode0
-			if (PORTDbits.RD9 == 1)
-			{
-				//СВ БЗ выключился
-				PORTDbits.RD5 = 0;  //выключение питания БЗ
-				nmb_timer_stop();
-			}
-			else
-			{
-				//СВ БЗ не выключился
-				if (nmb_clock_ms >= 1000)
-				{
-					//таймаут, ошибка
-					nmb_error = 1;
-					PORTDbits.RD5 = 0;  //выключение питания БЗ
-					nmb_timer_stop();
-				}
-			}
-			break;
-		case 2:
-			//from mode2 to mode0
-			if (PORTDbits.RD10 == 1)
-			{
-				//СВ ГВИ выключился
-				nmb_timer_stop();
-			}
-			else
-			{
-				//СВ ГВИ не выключился
-				if (nmb_clock_ms >= 1000)
-				{
-					//таймаут, ошибка
-					nmb_error = 1;
-					nmb_timer_stop();
-				}
-			}
-			break;
-		case 3:
-			//from mode3 to mode0
-			if (PORTDbits.RD11 == 0)
-			{
-				//СВ БТР выключился
-				nmb_timer_stop();
-			}
-			else
-			{
-				//СВ БТР не выключился
-				if (nmb_clock_ms >= 25)
-				{
-					//таймаут, ошибка
-					nmb_error = 1;
-					nmb_timer_stop();
-				}
-			}
-			break;
-		default:
-			nmb_timer_stop();
-			break;
-	}
-}
-
-
-static int nmb_timer_is_active(void)
-{
-	return T1CONbits.TON;
-}
-
-
-static void nmb_timer_start(void)
-{
-	nmb_clock_ms = 0;
-	nmb_timer_mode = nmb_mode;
-	T1CON = 0;
-	T1CONbits.TCS = 0;    //Timer1 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
-	T1CONbits.TCKPS = 2;  //1:64 
-	PR1 = 0x3D09;       //период = 25нс * 64 * 0x3D09 = 25мс
-	IPC0bits.T1IP = 4;  //приоритет прерывания = 4
-	IFS0bits.T1IF = 0;  //на всякий случай сбрасываем флаг прерывания 
-	IEC0bits.T1IE = 1;  //разрешаем прерывания от таймера1
-	T1CONbits.TON = 1;  //включаем таймер
-}
 
 
 static int nmb_set_k(unsigned char *data_in, unsigned char size_in, unsigned char *data_out, unsigned char *size_out)
@@ -584,58 +405,3 @@ int nmb_process_data(unsigned char *data_in, unsigned char size_in,
 }
 
 
-void nmb_eeprom_write_default_values(void)
-{
-	int i;
-
-	for (i = 0; i < NMB_NUMBER_OF_SENSORS; i++)
-	{
-		//значение по-умолчанию для калибровочных коэффициентов
-		eeprom_write_word(ADDR_EEPROM_K1 + i * 2, NMB_K);
-	}
-	
-	return;
-}
-
-
-
-void nmb_ext_init(void)
-{
-	int i;
-	
-	nmb_mode = 0;
-	nmb_error = 0;
-
-	//переменные EEPROM
-	for(i = 0; i < NMB_NUMBER_OF_SENSORS; i++)
-		eeprom_read_buf(ADDR_EEPROM_K1 + i * 2, (unsigned char*)&nmb_k[i], 2);
-
-	//ножки на вход
-	TRISDbits.TRISD9 = 1;  //вход СВ(свидетель) вкл\выкл питания БЗ
-	TRISDbits.TRISD10 = 1; //вход СВ вкл\выкл питания ГВИ
-	TRISDbits.TRISD11 = 1; //вход СВ вкл\выкл БТР
-	TRISFbits.TRISF0 = 1;  //вход Защ. БИ нет/сраб
-	TRISGbits.TRISG2 = 1;  //вход Защ. БЗ  нет/сраб
-	
-	//ножки на выход
-	TRISBbits.TRISB14 = 0; //выход разрешение зарядки БИ
-	PORTBbits.RB14 = 0;
-	TRISFbits.TRISF4 = 0;  //выход Ток0
-	PORTFbits.RF4 = 0;
-	TRISFbits.TRISF5 = 0;  //выход Ток1
-	PORTFbits.RF5 = 0;
-	TRISFbits.TRISF6 = 0;  //выход Ток2
-	PORTFbits.RF6 = 0;
-
-	TRISDbits.TRISD4 = 0;  //выход включение питания БЗ
-	PORTDbits.RD4 = 0;
-	TRISDbits.TRISD5 = 0;  //выход выключение питания БЗ
-	PORTDbits.RD5 = 0;
-	TRISDbits.TRISD7 = 0;  //выход включение БТР
-	PORTDbits.RD7 = 1;     //0=включен 1=выключен
-	TRISDbits.TRISD8 = 0;  //выход включение питания ГВИ
-	PORTDbits.RD8 = 0;
-	
-	TRISGbits.TRISG3 = 0;  //сброс АЗ БЗ (0=нет сброса, 1=сброс)
-	PORTGbits.RG3 = 0;
-}

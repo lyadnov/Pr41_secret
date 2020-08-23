@@ -1,6 +1,6 @@
 #include "main\p33FJ128GP706.h"
 #include "main\errors.h" 
-#include "system\nmb\nmb.h"
+#include "system\nmb\nmb_low.h"
 #include "system\usart\usart.h"
 
 //unsigned int stat_usart_error_timout = 0;

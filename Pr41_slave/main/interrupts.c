@@ -1,5 +1,5 @@
 #include "p33FJ128GP706.h"
-#include "system\nmb\nmb_ext.h"
+#include "system\nmb\nmb_timer.h"
 
 void __attribute__((interrupt,auto_psv)) _T1Interrupt(void)
 {
