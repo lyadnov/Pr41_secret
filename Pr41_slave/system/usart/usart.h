@@ -3,7 +3,7 @@
 
 #define USART_19200
 //#define USART_115200
-//#define USART_9bit
+#define USART_9bit
 
 void rs485_send_on(void);
 void rs485_send_off(void);

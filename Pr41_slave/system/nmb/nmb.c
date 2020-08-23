@@ -8,6 +8,7 @@
 #define NMB_DEFAULT_K      4095
 unsigned short nmb_k[NMB_NUMBER_OF_SENSORS];
 
+
 void nmb_main_loop(void)
 {
 	int res;
