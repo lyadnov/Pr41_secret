@@ -6,11 +6,17 @@
 
 #define NMB_SLAVE_ADDR      0x64
 
-unsigned short stat_nmb_slave_addr_error = 0;
-unsigned short stat_nmb_crc_error = 0;
-unsigned short stat_nmb_frame_format_error = 0;
-unsigned short stat_nmb_frame_format_9bit_error = 0;
-unsigned short stat_nmb_not_supported_error = 0;
+unsigned short stat_nmb_total_frame_num = 0;
+	unsigned short stat_nmb_frame_good = 0;
+	unsigned short stat_usart_error_frame = 0;
+	unsigned short stat_usart_error_timout = 0;
+	unsigned short stat_usart_error_parity = 0;
+	unsigned short stat_usart_error_overrun = 0;
+	unsigned short stat_nmb_slave_addr_error = 0;
+	unsigned short stat_nmb_crc_error = 0;
+	unsigned short stat_nmb_frame_format_error = 0;
+	unsigned short stat_nmb_frame_format_9bit_error = 0;
+	unsigned short stat_nmb_not_supported_error = 0;
 
 
 static unsigned short nmb_get_crc_ext(unsigned char *pcBlock, unsigned short len)
@@ -56,7 +62,10 @@ static char nmb_read_byte(unsigned char *c, int start_of_frame)
 	char res;
 	unsigned short val;
 
-	res = UsartRxByte(&val);
+	if (start_of_frame)
+		res = UsartRxByte(&val); //начало фрейма - ждем данных без таймаута
+	else
+		res = UsartRxByte_withTimeout(&val);  //середина фрейма - таймаут 1.5 символа
 	if (res)
 		return res;
 
@@ -121,6 +130,7 @@ int nmb_receive_frame(unsigned char *master_addr, unsigned char *frame_number, u
 
 	//1 receive slave addr
 	res = nmb_read_byte(&val, 1);
+  stat_nmb_total_frame_num++;
 	if (res)
 		return res;
 	if (val != NMB_SLAVE_ADDR)
@@ -168,5 +178,6 @@ int nmb_receive_frame(unsigned char *master_addr, unsigned char *frame_number, u
 		return 1;
 	}
 
+	stat_nmb_frame_good++;
 	return 0;
 }

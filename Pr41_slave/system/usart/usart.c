@@ -3,10 +3,6 @@
 #include "system\nmb\nmb_low.h"
 #include "system\usart\usart.h"
 
-//unsigned int stat_usart_error_timout = 0;
-unsigned int stat_usart_error_frame = 0;
-unsigned int stat_usart_error_parity = 0;
-unsigned int stat_usart_error_overrun = 0;
 
 void rs485_send_on(void)
 {
@@ -16,7 +12,7 @@ void rs485_send_on(void)
 	T8CON = 0;
 	T8CONbits.TCS = 0;            //Timer8 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
 	T8CONbits.TCKPS = 3;          //1:256  1такт=25*256нс=6.4мкс
-	PR8 = USART_NMB_PAUSE;        //=400мкс
+	PR8 = USART_NMB_PAUSE;        //=860мкс
 	TMR8 = 0;
 	IFS3bits.T8IF = 0; //сбрасываем флаг
 	T8CONbits.TON = 1; //включаем таймер 8
@@ -50,7 +46,7 @@ static void rs485_init(void)
 void UsartTxByteX(unsigned char data,unsigned char bit9)
 {
 	unsigned short val;
-	while (U1STAbits.UTXBF==1); //ждем окончани€ отправки предыдущих данных
+	while (U1STAbits.UTXBF == 1); //ждем окончани€ отправки предыдущих данных
 	
 	val = ((unsigned short)data) | (((unsigned short)bit9) << 8);
 
@@ -58,12 +54,11 @@ void UsartTxByteX(unsigned char data,unsigned char bit9)
 }
 
 
-char UsartRxByte(unsigned short *data) //dml!!! добавить таймаут
-//принимает байт, таймаут 13-26мсек
+char UsartRxByte(unsigned short *data)
 //возвращает 1, в случае ошибки, 0 если все успешно
 {
 
-	while(U1STAbits.URXDA==0);
+	while(U1STAbits.URXDA == 0);
 		
 	//провер€ю что прин€ли данные без ошибок
 	if(U1STAbits.FERR)                 // If a framing error occured
@@ -83,13 +78,71 @@ char UsartRxByte(unsigned short *data) //dml!!! добавить таймаут
 
 	if(U1STAbits.OERR)                 //переполнение буфера
 	{ 
-		U1STAbits.OERR=0;
+		U1STAbits.OERR = 0;
 		stat_usart_error_overrun++;
 		return(1);   
 	}
 
 	return (0);                     // Return the received data
 }
+
+
+char UsartRxByte_withTimeout(unsigned short *data)
+//принимает байт, таймаут 860мкс
+//возвращает 1, в случае ошибки, 0 если все успешно
+{
+	T8CON = 0;
+	T8CONbits.TCS = 0;        //Timer8 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
+	T8CONbits.TCKPS = 3;      //1:256  1такт=25*256нс=6.4мкс
+	PR8 = USART_NMB_RECEIVE_TIMEOUT;   //=860мкс
+	do
+	{
+		TMR8 = 0;
+		IFS3bits.T8IF=0; //сбрасываем флаг
+		T8CONbits.TON=1; //включаем таймер 8
+		while ((U1STAbits.URXDA == 0) && (IFS3bits.T8IF == 0));
+
+		if(U1STAbits.URXDA == 0)
+		{
+			//выходим по таймауту
+			T8CONbits.TON=0; //выключаем таймер 8
+			stat_usart_error_timout++;
+			return(1); //ошибка таймаут
+		}
+		else
+		{
+			T8CONbits.TON=0; //выключаем таймер 8
+			break;
+		}
+	}while(1);
+
+	//провер€ю что прин€ли данные без ошибок
+	if(U1STAbits.FERR)                 // If a framing error occured
+	{
+		*data = U1RXREG; 
+		stat_usart_error_frame++;
+		return(1);
+	}
+	if(U1STAbits.PERR)                 // If a parity error occured
+	{
+		*data = U1RXREG; 
+		stat_usart_error_parity++;
+		return(1);
+	}
+
+	*data = U1RXREG; 
+
+	if(U1STAbits.OERR)                 //переполнение буфера
+	{ 
+		U1STAbits.OERR = 0;
+		stat_usart_error_overrun++;
+		return(1);   
+	}
+
+	return (0);                     // Return the received data
+}
+
+
 
 
 void UsartWaitForSilence(void)
@@ -145,13 +198,14 @@ void UsartInit(void)
 	//модуль usart
 #ifdef USART_19200
 	U1MODEbits.BRGH=1;       //High Baud Rate Enable bit
-	U1BRG=520;               //19193бит/сек= (40*1000*1000√ц)/(4*(520+1))  
+	//U1BRG=520;             //19193бит/сек= (40*1000*1000√ц)/(4*(520+1))
+	U1BRG=521;               //19157бит/сек= (40*1000*1000√ц)/(4*(520+1))
 #elif defined USART_115200
 	/* USART speed 115200 */
 	U1MODEbits.BRGH=1;       //High Baud Rate Enable bit
-	U1BRG=86;                //115200бит/сек= (40*1000*1000√ц)/(4*(86+1))  
+	U1BRG=86;                //114942/сек= (40*1000*1000√ц)/(4*(86+1))  
 	//U1MODEbits.BRGH=0;     //High Baud Rate Enable bit
-	//U1BRG=21;              //115200бит/сек: 113636бит/сек=(40*1000*1000√ц)/(16*(86+1))  
+	//U1BRG=21;              //113636бит/сек=(40*1000*1000√ц)/(16*(86+1))  
 #else
 	Error!
 #endif
