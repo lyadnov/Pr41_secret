@@ -33,6 +33,13 @@ void rs485_send_off(void)
 	data = U1RXREG;  //поэтому вычитываем 4 байта,которые зеркально прилетают обратно при любых TX транзакци€х
 	data = U1RXREG;
 	data = U1RXREG;
+
+	if(U1STAbits.FERR)
+		data = U1RXREG;  //paranoid verification, just in case
+
+	if(U1STAbits.OERR)
+		U1STAbits.OERR = 0; //NOTE: if U1MODEbits.BRGH == 0, then this flag sometimes on
+
 }
 
 
@@ -143,8 +150,6 @@ char UsartRxByte_withTimeout(unsigned short *data)
 }
 
 
-
-
 void UsartWaitForSilence(void)
 //функци€ ждет пока в линни не наступит тишина длительностью 1.5 символа
 //1.5 символа = ( 1сек / ((19200бит_сек/11бит_в_байте)) )*1.5 = 860 мкс
@@ -197,45 +202,56 @@ void UsartInit(void)
 	
 	//модуль usart
 #ifdef USART_19200
-	U1MODEbits.BRGH=1;       //High Baud Rate Enable bit
-	//U1BRG=520;             //19193бит/сек= (40*1000*1000√ц)/(4*(520+1))
-	U1BRG=521;               //19157бит/сек= (40*1000*1000√ц)/(4*(520+1))
+#if 0 
+	/* NOTE: We have problem with BRGH = 1
+	   errata https://ww1.microchip.com/downloads/en/DeviceDoc/80446f.pdf
+	   "19. Module: UART" - "if BRGH == 1 UART receptions may be corrupted"
+	   In our case: sometimes received additional 0-bit with 0 in first byte, other
+	   bites received shifted.
+	   Instead of 0x64 + 1_in_9bit, I receive 0xC8 + 0_in_9bit
+	*/
+	U1MODEbits.BRGH = 1;       //High Baud Rate Enable bit
+	//U1BRG = 520;             //19193бит/сек= (40*1000*1000√ц)/(4*(520+1))
+	U1BRG = 521;               //19157бит/сек= (40*1000*1000√ц)/(4*(520+1))
+#endif
+	U1MODEbits.BRGH = 0;
+	U1BRG = 129;               //19230бит/сек=(40*1000*1000√ц)/(16*(129+1))  
 #elif defined USART_115200
 	/* USART speed 115200 */
-	U1MODEbits.BRGH=1;       //High Baud Rate Enable bit
-	U1BRG=86;                //114942/сек= (40*1000*1000√ц)/(4*(86+1))  
-	//U1MODEbits.BRGH=0;     //High Baud Rate Enable bit
-	//U1BRG=21;              //113636бит/сек=(40*1000*1000√ц)/(16*(86+1))  
+	U1MODEbits.BRGH = 1;       //High Baud Rate Enable bit
+	U1BRG = 86;                //114942/сек= (40*1000*1000√ц)/(4*(86+1))  
+	//U1MODEbits.BRGH = 0;     //High Baud Rate Enable bit
+	//U1BRG = 21;              //113636бит/сек=(40*1000*1000√ц)/(16*(86+1))  
 #else
 	Error!
 #endif
 	
-	U1MODEbits.UEN=0;       //TX RX - используем, а вс€кие CTS RTS - нет    
+	U1MODEbits.UEN = 0;       //TX RX - используем, а вс€кие CTS RTS - нет    
 #ifdef USART_9bit
-	U1MODEbits.PDSEL=3;     //9bit no parity
+	U1MODEbits.PDSEL = 3;     //9bit no parity
 #else
-	U1MODEbits.PDSEL=0;     //8bit четность выкл.
+	U1MODEbits.PDSEL = 0;     //8bit четность выкл.
 #endif
-	U1MODEbits.STSEL=0;     //1 стоп бит
-	U1MODEbits.URXINV=0;    //UxRX Idle state is С1Т
+	U1MODEbits.STSEL = 0;     //1 стоп бит
+	U1MODEbits.URXINV = 0;    //UxRX Idle state is С1Т
 		 
 	//прерывани€
-	U1STAbits.URXISEL=0;    //прерывание по каждому пришедшему байту
-	U1STAbits.UTXISEL0=0;    //?
-	U1STAbits.UTXISEL1=0;
-	IPC2bits.U1RXIP=4;  //приоритет прерывани€ =4
-	IPC3bits.U1TXIP=4;  //приоритет прерывани€ =4
-	IPC16bits.U1EIP=4;  //приоритет прерывани€ =4
-	IEC0bits.U1TXIE=0;  //прерывани€ на передачу запрещены
-	IEC0bits.U1RXIE=0;  //прерывани€ на прием запрещены
-	IEC4bits.U1EIE=0;   //прерывани€ по ошибке запрещены
+	U1STAbits.URXISEL = 0;    //прерывание по каждому пришедшему байту
+	U1STAbits.UTXISEL0 = 0;    //?
+	U1STAbits.UTXISEL1 = 0;
+	IPC2bits.U1RXIP = 4;  //приоритет прерывани€ =4
+	IPC3bits.U1TXIP = 4;  //приоритет прерывани€ =4
+	IPC16bits.U1EIP = 4;  //приоритет прерывани€ =4
+	IEC0bits.U1TXIE = 0;  //прерывани€ на передачу запрещены
+	IEC0bits.U1RXIE = 0;  //прерывани€ на прием запрещены
+	IEC4bits.U1EIE = 0;   //прерывани€ по ошибке запрещены
 		
-	U1MODEbits.UARTEN=1;    //UART1 is enabled
-	U1STAbits.UTXEN=1;      //Transmit Enable
+	U1MODEbits.UARTEN = 1;    //UART1 is enabled
+	U1STAbits.UTXEN = 1;      //Transmit Enable
 
-	IFS0bits.U1TXIF=0;  //на вс€кий случай сбрасываем флаг прерывани€      
-	IFS0bits.U1RXIF=0;
-	IFS4bits.U1EIF=0;
+	IFS0bits.U1TXIF = 0;  //на вс€кий случай сбрасываем флаг прерывани€      
+	IFS0bits.U1RXIF = 0;
+	IFS4bits.U1EIF = 0;
 	
 	return;
 }
