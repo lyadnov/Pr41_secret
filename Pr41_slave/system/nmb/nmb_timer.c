@@ -1,9 +1,10 @@
 #include "p33FJ128GP706.h"
 #include "system\nmb\nmb_high.h"
 
+#define NMB_MODE_SWITCH_TIMEOUT_MS 2000
+
 unsigned int nmb_clock_ms; //in ms
 unsigned int nmb_timer_mode;
-
 
 void nmb_timer2_stop(void)
 {
@@ -65,7 +66,7 @@ void nmb_timer_callback(void)
 				else
 				{
 					//СВ БЗ не включился
-					if (nmb_clock_ms >= 1000)
+					if (nmb_clock_ms >= NMB_MODE_SWITCH_TIMEOUT_MS)
 					{
 						//таймаут, ошибка
 						nmb_error = 1;
@@ -85,7 +86,7 @@ void nmb_timer_callback(void)
 				else
 				{
 					//СВ БЗ не включился
-					if (nmb_clock_ms >= 1000)
+					if (nmb_clock_ms >= NMB_MODE_SWITCH_TIMEOUT_MS)
 					{
 						//таймаут, ошибка
 						nmb_error = 1;
@@ -104,7 +105,7 @@ void nmb_timer_callback(void)
 				else
 				{
 					//СВ БЗ не включился
-					if (nmb_clock_ms >= 25)
+					if (nmb_clock_ms >= NMB_MODE_SWITCH_TIMEOUT_MS)
 					{
 						//таймаут, ошибка
 						nmb_error = 1;
@@ -124,7 +125,7 @@ void nmb_timer_callback(void)
 			else
 			{
 				//СВ БЗ не выключился
-				if (nmb_clock_ms >= 1000)
+				if (nmb_clock_ms >= NMB_MODE_SWITCH_TIMEOUT_MS)
 				{
 					//таймаут, ошибка
 					nmb_error = 1;
@@ -143,7 +144,7 @@ void nmb_timer_callback(void)
 			else
 			{
 				//СВ ГВИ не выключился
-				if (nmb_clock_ms >= 1000)
+				if (nmb_clock_ms >= NMB_MODE_SWITCH_TIMEOUT_MS)
 				{
 					//таймаут, ошибка
 					nmb_error = 1;
@@ -161,7 +162,7 @@ void nmb_timer_callback(void)
 			else
 			{
 				//СВ БТР не выключился
-				if (nmb_clock_ms >= 25)
+				if (nmb_clock_ms >= NMB_MODE_SWITCH_TIMEOUT_MS)
 				{
 					//таймаут, ошибка
 					nmb_error = 1;
