@@ -225,6 +225,13 @@ static int nmb_set_mode2_gvi(unsigned char size_in, unsigned char *data_out, uns
 	if ((nmb_mode != 0) && (nmb_mode != 2))
 		return 1;
 
+	if (PORTDbits.RD9 == 0)
+	{
+		//СВ БЗ включился => нельзя включать питание ГВИ (paranoid verification)
+		nmb_error = 1;
+		return 1;
+	}
+	
 	//set outputs
 	if (nmb_mode == 0)
 	{
@@ -253,6 +260,13 @@ static int nmb_set_mode1_charging(unsigned char *data_in, unsigned char size_in,
 		return 1;
 	if ((nmb_mode != 0) && (nmb_mode != 1))
 		return 1;
+
+	if (PORTDbits.RD10 == 0)
+	{
+		//СВ ГВИ включился => нельзя включать питание БЗ (paranoid verification)
+		nmb_error = 1;
+		return 1;
+	}
 
 	//set outputs
 	config.byte = data_in[1];
