@@ -64,7 +64,7 @@ void ADC_Init(void)
 
 unsigned short ADC_get(unsigned char sensor_num) //сейчас 1АЦП длится 32мкс
 {
-	unsigned short result=0;
+	unsigned short result = 0;
 		 
 	switch(sensor_num)
 	{
@@ -93,13 +93,13 @@ unsigned short ADC_get(unsigned char sensor_num) //сейчас 1АЦП длится 32мкс
 			return 0;
 	} 
 		
-		//AD1CON1bits.DONE=0;  //сбрасываем бит перед очередним АЦП преобразованием, хотя он сбрасывается автоматически
-		AD1CON1bits.SAMP=1;
+		//AD1CON1bits.DONE = 0;  //сбрасываем бит перед очередним АЦП преобразованием, хотя он сбрасывается автоматически
+		AD1CON1bits.SAMP = 1;
 		
-		while(AD1CON1bits.DONE==0); //ждем окончания АЦП
+		while (AD1CON1bits.DONE == 0); //ждем окончания АЦП
 		
-		AD1CON1bits.DONE=0; //вот это обязательно надо делать, иначе считывается результат предыдущей оцифровки
-		result=ADC1BUF0;
+		AD1CON1bits.DONE = 0; //вот это обязательно надо делать, иначе считывается результат предыдущей оцифровки
+		result = ADC1BUF0;
 	
 		return result;
 }
