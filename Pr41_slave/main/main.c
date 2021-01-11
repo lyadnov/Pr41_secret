@@ -45,7 +45,7 @@ void Init(void)
 	C1CTRL1bits.REQOP = 1; //disable mode
 	C2CTRL1bits.REQOP = 1; //disable mode
 
-	//инициаллизация портов, все ножки - на вход по-умолчанию, чтобы не было просадки по питанию.
+	//инициализация портов, все ножки - на вход по-умолчанию, чтобы не было просадки по питанию.
 	TRISB = 0xFFFF;  
 	TRISC = 0xFFFF;
 	TRISD = 0xFFFF;  
@@ -62,11 +62,11 @@ void Init(void)
 	INTCON2 = 0;
 	INTCON2bits.ALTIVT = 0;   //Use standard (default) vector table
 		
-	//-------------инициаллизация переменных в EEPROM-------------- 
+	//-------------инициализация переменных в EEPROM-------------- 
 	eeprom_ver = eeprom_read(ADDR_EEPROM_VERSION);  //проверка EEPROM на наличие правильных записанных в него данных  
 	if (eeprom_ver != EEPROM_VERSION) eeprom_write_default_values();
 
-	//-------------инициаллизация периферии-----------------------  
+	//-------------инициализация периферии-----------------------  
 		
 	//----USART-------  + Timer8 для поиска пауз на линии
 	UsartInit();

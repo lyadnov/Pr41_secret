@@ -16,21 +16,25 @@ void nmb_timer2_stop(void)
 
 void nmb_timer2_callback(void)
 {
-	if (PORTGbits.RG2 == 1) //вход Защ. БЗ  нет/сраб
+	if (PORTGbits.RG2 == 0) //вход Защ. БЗ  0=защита сработала 1= не сработала
 	{
-		PORTGbits.RG3 = 0; //сброс АЗ БЗ (0=нет сброса, 1=сброс)
-		nmb_timer2_stop();
+		//защита не сбросилась, хотя мы просили => ошибка
+		nmb_error = 1;
 	}
+
+	PORTGbits.RG3 = 0; //сброс АЗ БЗ (0=нет сброса, 1=сброс)
+	nmb_timer2_stop();
 }
 
 
 void nmb_timer2_start(void)
 {
 	T2CON = 0;
+	TMR2 = 0;
 	T2CONbits.TCS = 0;   //Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
 	T2CONbits.T32 = 0;   //16bit mode
-	T2CONbits.TCKPS = 2; //1:64
-	PR2 = 0x3D09;        //период = 25нс * 64 * 0x3D09 = 25мс
+	T2CONbits.TCKPS = 1; //1:8
+	PR2 = 0x2710;        //период = 25нс * 8 * 0x2710 = 2мс
 	IPC1bits.T2IP = 5;    //приоритет прерывания = 5
 	IFS0bits.T2IF = 0;    //на всякий случай сбрасываем флаг прерывания 
 	IEC0bits.T2IE = 1;    //разрешаем прерывания от таймера2
@@ -188,6 +192,7 @@ void nmb_timer_start(void)
 	nmb_clock_ms = 0;
 	nmb_timer_mode = nmb_mode;
 	T1CON = 0;
+	TMR1 = 0;
 	T1CONbits.TCS = 0;    //Timer1 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2
 	T1CONbits.TCKPS = 2;  //1:64 
 	PR1 = 0x3D09;       //период = 25нс * 64 * 0x3D09 = 25мс
