@@ -97,7 +97,7 @@ void nmb_init(void)
 	TRISDbits.TRISD5 = 0;  //выход выключение питания БЗ
 	PORTDbits.RD5 = 0;
 	TRISDbits.TRISD7 = 0;  //выход включение БТР
-	PORTDbits.RD7 = 1;     //0=включен 1=выключен
+	PORTDbits.RD7 = 0;     //0=включен 1=выключен, выставляем почему то 0 при старте.
 	TRISDbits.TRISD8 = 0;  //выход включение питания ГВИ
 	PORTDbits.RD8 = 0;
 	
