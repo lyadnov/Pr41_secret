@@ -6,8 +6,7 @@
 #include "system\nmb\nmb_high.h"
 
 #define NMB_DEFAULT_K      4095
-unsigned short nmb_val[NMB_NUMBER_OF_SENSORS];
-unsigned short nmb_adc[NMB_NUMBER_OF_SENSORS];
+unsigned short nmb_k[NMB_NUMBER_OF_SENSORS];
 
 
 void nmb_main_loop(void)
@@ -58,8 +57,7 @@ void nmb_eeprom_write_default_values(void)
 	for (i = 0; i < NMB_NUMBER_OF_SENSORS; i++)
 	{
 		//значение по-умолчанию для калибровочных коэффициентов
-		eeprom_write_word(ADDR_EEPROM_SENSOR1_VAL + i * 2, NMB_DEFAULT_K);
-		eeprom_write_word(ADDR_EEPROM_SENSOR1_ADC + i * 2, NMB_DEFAULT_K);
+		eeprom_write_word(ADDR_EEPROM_K1 + i * 2, NMB_DEFAULT_K);
 	}
 	
 	return;
@@ -75,11 +73,7 @@ void nmb_init(void)
 
 	//переменные EEPROM
 	for(i = 0; i < NMB_NUMBER_OF_SENSORS; i++)
-	{
-		eeprom_read_buf(ADDR_EEPROM_SENSOR1_VAL + i * 2, (unsigned char*)&nmb_val[i], 2);
-		eeprom_read_buf(ADDR_EEPROM_SENSOR1_ADC + i * 2, (unsigned char*)&nmb_adc[i], 2);
-	}
-
+		eeprom_read_buf(ADDR_EEPROM_K1 + i * 2, (unsigned char*)&nmb_k[i], 2);
 
 	//ножки на вход
 	TRISDbits.TRISD9 = 1;  //вход СВ(свидетель) вкл\выкл питания БЗ

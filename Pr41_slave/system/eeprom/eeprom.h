@@ -11,20 +11,13 @@
 
 //адреса в EEPROM
 #define ADDR_EEPROM_VERSION          0x00
-#define ADDR_EEPROM_SENSOR1_VAL      0x01                //истинное значение сенсора 1, 2 байта
-#define ADDR_EEPROM_SENSOR2_VAL      (ADDR_EEPROM_SENSOR1_VAL + 2)
-#define ADDR_EEPROM_SENSOR3_VAL      (ADDR_EEPROM_SENSOR1_VAL + 4)
-#define ADDR_EEPROM_SENSOR4_VAL      (ADDR_EEPROM_SENSOR1_VAL + 6)
-#define ADDR_EEPROM_SENSOR5_VAL      (ADDR_EEPROM_SENSOR1_VAL + 8)
-#define ADDR_EEPROM_SENSOR6_VAL      (ADDR_EEPROM_SENSOR1_VAL + 10)
-#define ADDR_EEPROM_SENSOR7_VAL      (ADDR_EEPROM_SENSOR1_VAL + 12)
-#define ADDR_EEPROM_SENSOR1_ADC      (ADDR_EEPROM_SENSOR1_VAL + 14)  //ADC значение, соответствующее истинному для сенсора 1, 2 байта
-#define ADDR_EEPROM_SENSOR2_ADC      (ADDR_EEPROM_SENSOR1_ADC + 2)
-#define ADDR_EEPROM_SENSOR3_ADC      (ADDR_EEPROM_SENSOR1_ADC + 4)
-#define ADDR_EEPROM_SENSOR4_ADC      (ADDR_EEPROM_SENSOR1_ADC + 6)
-#define ADDR_EEPROM_SENSOR5_ADC      (ADDR_EEPROM_SENSOR1_ADC + 8)
-#define ADDR_EEPROM_SENSOR6_ADC      (ADDR_EEPROM_SENSOR1_ADC + 10)
-#define ADDR_EEPROM_SENSOR7_ADC      (ADDR_EEPROM_SENSOR1_ADC + 12)
+#define ADDR_EEPROM_K1               0x01                //К1, 2 байта
+#define ADDR_EEPROM_K2               (ADDR_EEPROM_K1+2)
+#define ADDR_EEPROM_K3               (ADDR_EEPROM_K1+4)
+#define ADDR_EEPROM_K4               (ADDR_EEPROM_K1+6)
+#define ADDR_EEPROM_K5               (ADDR_EEPROM_K1+8)
+#define ADDR_EEPROM_K6               (ADDR_EEPROM_K1+10)
+#define ADDR_EEPROM_K7               (ADDR_EEPROM_K1+12)
 
 
 //---------переменные--------------
