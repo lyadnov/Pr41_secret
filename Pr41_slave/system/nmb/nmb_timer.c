@@ -4,7 +4,7 @@
 #define NMB_MODE_SWITCH_TIMEOUT_MS 2000
 
 unsigned int nmb_clock_ms; //in ms
-unsigned int nmb_timer_mode;
+unsigned int nmb_old_mode;
 
 void nmb_timer2_stop(void)
 {
@@ -55,10 +55,30 @@ void nmb_timer_callback(void)
 {
 	nmb_clock_ms += 25;
 	
-	switch (nmb_timer_mode)
+	switch (nmb_old_mode)
 	{
 		case 0:
-			if (nmb_mode == 1) //Зарядка БИ
+			if (nmb_mode == 0)
+			{
+				/* костыль: RD7 при старте = 0, и при переходе из режима 0 в режим 0
+				   нужно выставить ножку в 1 и проверить, что RD11 выставилась в 0 */
+				if (PORTDbits.RD11 == 0)
+				{
+					//СВ БТР выключился
+					nmb_timer_stop();
+				}
+				else
+				{
+					//СВ БТР не выключился
+					if (nmb_clock_ms >= NMB_MODE_SWITCH_TIMEOUT_MS)
+					{
+						//таймаут, ошибка
+						nmb_error = 1;
+						nmb_timer_stop();
+					}
+				}
+			}
+			else if (nmb_mode == 1) //Зарядка БИ
 			{
 				//from mode0 to mode1
 				if (PORTDbits.RD9 == 0)
@@ -190,7 +210,7 @@ int nmb_timer_is_active(void)
 void nmb_timer_start(void)
 {
 	nmb_clock_ms = 0;
-	nmb_timer_mode = nmb_mode;
+	nmb_old_mode = nmb_mode;
 	T1CON = 0;
 	TMR1 = 0;
 	T1CONbits.TCS = 0;    //Timer1 Clock Source Select bit: Internal clock (Fcy=40MHz=Fosc/2=80мгц/2

@@ -57,11 +57,10 @@ typedef struct {
 	};
 } NMB_CONFIG;
 
-
 typedef struct __attribute__((packed)) { //NOTE: without packed Ubi will be aligned to word
 	union {
 		struct {
-			unsigned char is_save:1;       //0
+			unsigned char is_calibrate:1;   //0
 			unsigned char is_Ubi:1;
 			unsigned char is_Tbz:1;
 			unsigned char is_Tbtr:1;
@@ -80,6 +79,7 @@ typedef struct __attribute__((packed)) { //NOTE: without packed Ubi will be alig
 	unsigned short Pne;
 	unsigned short U;
 } NMB_CALIBRATION;
+
 
 static
 int nmb_get_status_ext(unsigned char cmd, unsigned char *data_out, unsigned char *size_out);
@@ -160,7 +160,7 @@ unsigned short nmb_sensor_get_value(unsigned char sensor_num)
 
 
 static
-int nmb_set_k_ext(unsigned char sensor_num, unsigned short val, unsigned char is_save)
+int nmb_set_k_ext(unsigned char sensor_num, unsigned short val, unsigned char is_calibrate)
 {
 	unsigned long temp;
 
@@ -208,7 +208,7 @@ int nmb_set_k_ext(unsigned char sensor_num, unsigned short val, unsigned char is
 
 	nmb_val[sensor_num] = val;
 	nmb_adc[sensor_num] = temp;
-	if (is_save)
+	if (!is_calibrate)
 	{
 		eeprom_write_word(ADDR_EEPROM_SENSOR1_VAL + sensor_num * 2, nmb_val[sensor_num]);
 		eeprom_write_word(ADDR_EEPROM_SENSOR1_ADC + sensor_num * 2, nmb_adc[sensor_num]);
@@ -232,19 +232,19 @@ int nmb_set_k(unsigned char *data_in, unsigned char size_in, unsigned char *data
 	request = (NMB_CALIBRATION *) &data_in[1];
 
 	if (request->is_Ubi)
-		nmb_set_k_ext(0, request->Ubi, request->is_save);
+		nmb_set_k_ext(0, request->Ubi, request->is_calibrate);
 	if (request->is_Tbz)
-		nmb_set_k_ext(1, request->Tbz, request->is_save);
+		nmb_set_k_ext(1, request->Tbz, request->is_calibrate);
 	if (request->is_Tbtr)
-		nmb_set_k_ext(2, request->Tbtr, request->is_save);
+		nmb_set_k_ext(2, request->Tbtr, request->is_calibrate);
 	if (request->is_Tne)
-		nmb_set_k_ext(3, request->Tne, request->is_save);
+		nmb_set_k_ext(3, request->Tne, request->is_calibrate);
 	if (request->is_Hne)
-		nmb_set_k_ext(4, request->Hne, request->is_save);
+		nmb_set_k_ext(4, request->Hne, request->is_calibrate);
 	if (request->is_Pne)
-		nmb_set_k_ext(5, request->Pne, request->is_save);
+		nmb_set_k_ext(5, request->Pne, request->is_calibrate);
 	if (request->is_U)
-		nmb_set_k_ext(6, request->U, request->is_save);
+		nmb_set_k_ext(6, request->U, request->is_calibrate);
 	
 	nmb_get_status_ext(NBM_CMD_SET_K_RESPONSE, data_out, size_out);
 
@@ -390,31 +390,31 @@ int nmb_set_mode0_stop(unsigned char size_in, unsigned char *data_out, unsigned 
 		stat_nmb_frame_format_error++;
 		return 1;
 	}
-	if (nmb_timer_is_active() && (nmb_mode != 0))
+	if (nmb_timer_is_active())
 		return 1;
 
 	nmb_error = 0;
 
 	//set outputs
-	if (nmb_mode != 0)
+	switch (nmb_mode)
 	{
-		switch (nmb_mode)
-		{
-			case 1:
-				PORTBbits.RB14 = 0; //разрешение зарядки БИ
-				PORTDbits.RD5 = 1;  //выключение питания БЗ
-				break;
-			case 2:
-				PORTDbits.RD8 = 0; //включение питания ГВИ
-				break;
-			case 3:
-				PORTDbits.RD7 = 1; //выключение БТР (0=включен 1=выключен)
-				break;
-			default:
-				return 1;
-		}
-		nmb_timer_start();
+		case 0:
+			PORTDbits.RD7 = 1; //костыль, чтобы при старте RD7 из 0 переключилась в 1
+			break;
+		case 1:
+			PORTBbits.RB14 = 0; //разрешение зарядки БИ
+			PORTDbits.RD5 = 1;  //выключение питания БЗ
+			break;
+		case 2:
+			PORTDbits.RD8 = 0; //включение питания ГВИ
+			break;
+		case 3:
+			PORTDbits.RD7 = 1; //выключение БТР (0=включен 1=выключен)
+			break;
+		default:
+			return 1;
 	}
+	nmb_timer_start();
 
 	nmb_get_status_ext(NBM_CMD_MODE0_RESPONSE, data_out, size_out);
 	

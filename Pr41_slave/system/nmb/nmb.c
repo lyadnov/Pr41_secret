@@ -80,7 +80,6 @@ void nmb_init(void)
 		eeprom_read_buf(ADDR_EEPROM_SENSOR1_ADC + i * 2, (unsigned char*)&nmb_adc[i], 2);
 	}
 
-
 	//ножки на вход
 	TRISDbits.TRISD9 = 1;  //вход СВ(свидетель) вкл\выкл питания БЗ
 	TRISDbits.TRISD10 = 1; //вход СВ вкл\выкл питания ГВИ
@@ -103,7 +102,7 @@ void nmb_init(void)
 	TRISDbits.TRISD5 = 0;  //выход выключение питания БЗ
 	PORTDbits.RD5 = 0;
 	TRISDbits.TRISD7 = 0;  //выход включение БТР
-	PORTDbits.RD7 = 1;     //0=включен 1=выключен
+	PORTDbits.RD7 = 0;     //0=включен 1=выключен, выставляем почему то 0 при старте.
 	TRISDbits.TRISD8 = 0;  //выход включение питания ГВИ
 	PORTDbits.RD8 = 0;
 	
