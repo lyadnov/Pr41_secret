@@ -265,6 +265,7 @@ int nmb_get_status_ext(unsigned char cmd, unsigned char *data_out, unsigned char
 	status.protect_bz = PORTGbits.RG2;
 	status.protect_bi = PORTFbits.RF0;
 	status.ok = nmb_error ? 0 : 1;
+	nmb_error = 0;
 	status.not_used2 = 0;
 
 	data_out[0] = cmd;
@@ -285,21 +286,16 @@ int nmb_set_mode3_discharging(unsigned char size_in, unsigned char *data_out, un
 		stat_nmb_frame_format_error++;
 		return 1;
 	}
-	if (nmb_timer_is_active() && (nmb_mode != 3))
-		return 1;
 	if ((nmb_mode != 0) && (nmb_mode != 3))
 		return 1;
-
-	//set outputs
-	if (nmb_mode == 0)
-	{
-		PORTDbits.RD7 = 0; //включение БТР (0=включен 1=выключен)
-		nmb_timer_start();
-	}
-
-	nmb_get_status_ext(NBM_CMD_MODE3_RESPONSE, data_out, size_out);
 	
-	nmb_mode = 3;
+	if (!nmb_timer_is_active())
+	{
+		//set outputs
+		PORTDbits.RD7 = 0; //включение БТР (0=включен 1=выключен)
+		nmb_timer_start(3);
+	}
+	nmb_get_status_ext(NBM_CMD_MODE3_RESPONSE, data_out, size_out);
 
 	return 0;
 }
@@ -313,8 +309,7 @@ int nmb_set_mode2_gvi(unsigned char size_in, unsigned char *data_out, unsigned c
 		stat_nmb_frame_format_error++;
 		return 1;
 	}
-	if (nmb_timer_is_active() && (nmb_mode != 2))
-		return 1;
+
 	if ((nmb_mode != 0) && (nmb_mode != 2))
 		return 1;
 
@@ -325,16 +320,14 @@ int nmb_set_mode2_gvi(unsigned char size_in, unsigned char *data_out, unsigned c
 		return 1;
 	}
 	
-	//set outputs
-	if (nmb_mode == 0)
+	if (!nmb_timer_is_active())
 	{
+		//set outputs
 		PORTDbits.RD8 = 1; //включение питания ГВИ
-		nmb_timer_start();
+		nmb_timer_start(2);
 	}
-	
-	nmb_get_status_ext(NBM_CMD_MODE2_RESPONSE, data_out, size_out);
 
-	nmb_mode = 2;
+	nmb_get_status_ext(NBM_CMD_MODE2_RESPONSE, data_out, size_out);
 
 	return 0;
 }
@@ -350,8 +343,6 @@ int nmb_set_mode1_charging(unsigned char *data_in, unsigned char size_in, unsign
 		stat_nmb_frame_format_error++;
 		return 1;
 	}
-	if (nmb_timer_is_active() && (nmb_mode != 1))
-		return 1;
 	if ((nmb_mode != 0) && (nmb_mode != 1))
 		return 1;
 
@@ -368,15 +359,14 @@ int nmb_set_mode1_charging(unsigned char *data_in, unsigned char size_in, unsign
 	PORTFbits.RF4 = config.I_bit0;
 	PORTFbits.RF5 = config.I_bit1;
 	PORTFbits.RF6 = config.I_bit2;
-	if (nmb_mode == 0)
+	
+	if (!nmb_timer_is_active())
 	{
 		PORTDbits.RD4 = 1; //включение питания БЗ
-		nmb_timer_start();
+		nmb_timer_start(1);
 	}
 
 	nmb_get_status_ext(NBM_CMD_MODE1_RESPONSE, data_out, size_out);
-	
-	nmb_mode = 1;
 
 	return 0;
 }
@@ -390,35 +380,21 @@ int nmb_set_mode0_stop(unsigned char size_in, unsigned char *data_out, unsigned 
 		stat_nmb_frame_format_error++;
 		return 1;
 	}
-	if (nmb_timer_is_active())
-		return 1;
 
-	nmb_error = 0;
-
-	//set outputs
-	switch (nmb_mode)
+	if (!nmb_timer_is_active())
 	{
-		case 0:
-			PORTDbits.RD7 = 1; //костыль, чтобы при старте RD7 из 0 переключилась в 1
-			break;
-		case 1:
-			PORTBbits.RB14 = 0; //разрешение зарядки БИ
-			PORTDbits.RD5 = 1;  //выключение питания БЗ
-			break;
-		case 2:
-			PORTDbits.RD8 = 0; //включение питания ГВИ
-			break;
-		case 3:
-			PORTDbits.RD7 = 1; //выключение БТР (0=включен 1=выключен)
-			break;
-		default:
-			return 1;
+		//выключаем режим 1 БИ
+		PORTBbits.RB14 = 0; //запрещение зарядки БИ
+		PORTDbits.RD5 = 1;  //выключение питания БЗ
+		//выключаем режим 2 ГВИ
+		PORTDbits.RD8 = 0; //выключение питания ГВИ
+		//выключаем режим 3 БТР
+		PORTDbits.RD7 = 1; //выключение БТР
+		nmb_timer_start(0);
 	}
-	nmb_timer_start();
 
 	nmb_get_status_ext(NBM_CMD_MODE0_RESPONSE, data_out, size_out);
-	
-	nmb_mode = 0;
+
 	return 0;
 }
 

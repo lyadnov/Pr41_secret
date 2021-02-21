@@ -69,8 +69,8 @@ void nmb_eeprom_write_default_values(void)
 void nmb_init(void)
 {
 	int i;
-	
-	nmb_mode = 0;
+
+	nmb_mode = 3; //активный режим при старте 3=БТР
 	nmb_error = 0;
 
 	//переменные EEPROM
@@ -102,7 +102,7 @@ void nmb_init(void)
 	TRISDbits.TRISD5 = 0;  //выход выключение питания БЗ
 	PORTDbits.RD5 = 0;
 	TRISDbits.TRISD7 = 0;  //выход включение БТР
-	PORTDbits.RD7 = 0;     //0=включен 1=выключен, выставляем почему то 0 при старте.
+	PORTDbits.RD7 = 0;     //0=включен 1=выключен, потому что активный режим при старте 3=БТР
 	TRISDbits.TRISD8 = 0;  //выход включение питания ГВИ
 	PORTDbits.RD8 = 0;
 	
