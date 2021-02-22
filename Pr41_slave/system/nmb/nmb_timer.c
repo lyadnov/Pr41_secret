@@ -107,6 +107,7 @@ void nmb_timer_callback(void)
 				{
 					//СВ ГВИ выключился
 					nmb_timer_stop();
+					PORTDbits.RD5 = 0;  //выключение питания БЗ
 					nmb_mode = nmb_new_mode;
 				}
 				else
@@ -117,6 +118,7 @@ void nmb_timer_callback(void)
 						//таймаут, ошибка
 						nmb_error = 1;
 						nmb_timer_stop();
+						PORTDbits.RD5 = 0;  //выключение питания БЗ
 						if (PORTDbits.RD9 == 1)
 							PORTDbits.RD8 = 1; //возвращаем включение питания ГВИ
 					}
@@ -129,6 +131,7 @@ void nmb_timer_callback(void)
 				{
 					//СВ БТР выключился
 					nmb_timer_stop();
+					PORTDbits.RD5 = 0;  //выключение питания БЗ
 					nmb_mode = nmb_new_mode;
 				}
 				else
@@ -139,6 +142,7 @@ void nmb_timer_callback(void)
 						//таймаут, ошибка
 						nmb_timer_stop();
 						nmb_error = 1;
+						PORTDbits.RD5 = 0;  //выключение питания БЗ
 						PORTDbits.RD7 = 0; //оставляем БТР включенным
 					}
 				}
