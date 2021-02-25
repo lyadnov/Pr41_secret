@@ -451,8 +451,9 @@ int nmb_get_serial_number(unsigned char size_in, unsigned char *data_out, unsign
 	data_out[6] = 0x00;
 	data_out[7] = 0x00;
 	data_out[8] = 0x00;
+	data_out[9] = 0x01;
 
-	*size_out = 0x09;
+	*size_out = 0x0A;
 	return 0;
 }
 
