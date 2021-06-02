@@ -34,10 +34,10 @@ void rs485_send_off(void)
 	data = U1RXREG;
 	data = U1RXREG;
 
-	if(U1STAbits.FERR)
+	if (U1STAbits.FERR)
 		data = U1RXREG;  //paranoid verification, just in case
 
-	if(U1STAbits.OERR)
+	if (U1STAbits.OERR)
 		U1STAbits.OERR = 0; //NOTE: if U1MODEbits.BRGH == 0, then this flag sometimes on
 
 }
@@ -151,7 +151,7 @@ char UsartRxByte_withTimeout(unsigned short *data)
 
 
 void UsartWaitForSilence(void)
-//функция ждет пока в линни не наступит тишина длительностью 1.5 символа
+//функция ждет пока в линии не наступит тишина длительностью 1.5 символа
 //1.5 символа = ( 1сек / ((19200бит_сек/11бит_в_байте)) )*1.5 = 860 мкс
 //внешний тактовый генератор 80Мгц  на TMR8 подается 80МГЦ/2 + делитель 256. 
 // Т.е увеличение TMR8 на 1 происходит раз в (1/80Мгц)*256= раз в 6,4мкс
@@ -221,7 +221,7 @@ void UsartInit(void)
 	U1MODEbits.BRGH = 1;       //High Baud Rate Enable bit
 	U1BRG = 86;                //114942/сек= (40*1000*1000Гц)/(4*(86+1))  
 	//U1MODEbits.BRGH = 0;     //High Baud Rate Enable bit
-	//U1BRG = 21;              //113636бит/сек=(40*1000*1000Гц)/(16*(86+1))  
+	//U1BRG = 21;              //113636бит/сек=(40*1000*1000Гц)/(16*(21+1))  
 #else
 	Error!
 #endif
