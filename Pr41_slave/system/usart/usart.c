@@ -39,7 +39,6 @@ void rs485_send_off(void)
 
 	if (U1STAbits.OERR)
 		U1STAbits.OERR = 0; //NOTE: if U1MODEbits.BRGH == 0, then this flag sometimes on
-
 }
 
 
@@ -65,16 +64,16 @@ char UsartRxByte(unsigned short *data)
 //возвращает 1, в случае ошибки, 0 если все успешно
 {
 
-	while(U1STAbits.URXDA == 0);
+	while (U1STAbits.URXDA == 0);
 		
 	//провер€ю что прин€ли данные без ошибок
-	if(U1STAbits.FERR)                 // If a framing error occured
+	if (U1STAbits.FERR)                 // If a framing error occured
 	{
 		*data = U1RXREG; 
 		stat_usart_error_frame++;
 		return(1);
 	}
-	if(U1STAbits.PERR)                 // If a parity error occured
+	if (U1STAbits.PERR)                 // If a parity error occured
 	{
 		*data = U1RXREG; 
 		 stat_usart_error_parity++;
@@ -83,9 +82,9 @@ char UsartRxByte(unsigned short *data)
 
 	*data = U1RXREG; 
 
-	if(U1STAbits.OERR)                 //переполнение буфера
+	if (U1STAbits.OERR)                 //переполнение буфера
 	{ 
-		U1STAbits.OERR = 0;
+		U1STAbits.OERR=0;
 		stat_usart_error_overrun++;
 		return(1);   
 	}
@@ -105,32 +104,32 @@ char UsartRxByte_withTimeout(unsigned short *data)
 	do
 	{
 		TMR8 = 0;
-		IFS3bits.T8IF=0; //сбрасываем флаг
-		T8CONbits.TON=1; //включаем таймер 8
-		while ((U1STAbits.URXDA == 0) && (IFS3bits.T8IF == 0));
+		IFS3bits.T8IF = 0; //сбрасываем флаг
+		T8CONbits.TON = 1; //включаем таймер 8
+		while ((U1STAbits.URXDA == 0) && (IFS3bits.T8IF ==0 ));
 
-		if(U1STAbits.URXDA == 0)
+		if (U1STAbits.URXDA == 0)
 		{
 			//выходим по таймауту
-			T8CONbits.TON=0; //выключаем таймер 8
+			T8CONbits.TON = 0; //выключаем таймер 8
 			stat_usart_error_timout++;
 			return(1); //ошибка таймаут
 		}
 		else
 		{
-			T8CONbits.TON=0; //выключаем таймер 8
+			T8CONbits.TON = 0; //выключаем таймер 8
 			break;
 		}
-	}while(1);
+	} while(1);
 
 	//провер€ю что прин€ли данные без ошибок
-	if(U1STAbits.FERR)                 // If a framing error occured
+	if (U1STAbits.FERR)                 // If a framing error occured
 	{
 		*data = U1RXREG; 
 		stat_usart_error_frame++;
 		return(1);
 	}
-	if(U1STAbits.PERR)                 // If a parity error occured
+	if (U1STAbits.PERR)                 // If a parity error occured
 	{
 		*data = U1RXREG; 
 		stat_usart_error_parity++;
@@ -139,7 +138,7 @@ char UsartRxByte_withTimeout(unsigned short *data)
 
 	*data = U1RXREG; 
 
-	if(U1STAbits.OERR)                 //переполнение буфера
+	if (U1STAbits.OERR)                 //переполнение буфера
 	{ 
 		U1STAbits.OERR = 0;
 		stat_usart_error_overrun++;
@@ -186,7 +185,8 @@ void UsartWaitForSilence(void)
 		{
 			//данные пришли, а нужную паузу не выдержали - запускаем счетчик заново
 			data = U1RXREG;
-			if (U1STAbits.OERR) U1STAbits.OERR = 0; //переполнение буфера
+			if (U1STAbits.OERR)
+				U1STAbits.OERR = 0; //переполнение буфера
 		}
 	} while(1);
 }
